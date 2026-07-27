@@ -2,16 +2,19 @@ var SETTINGS_DOC_NAME = '給与明細設定値';
 var SETTINGS_DOC_NAME_CANDIDATES = ['給与明細設定値', '給与明細設定'];
 var DEFAULT_MASTER_FOLDER_ID = '1CD96PrUWhdAIXVtfrQCInTuBuceeukuZ'; // 初期値（プロパティ未設定時のフォールバック）
 var DEFAULT_EMPLOYEE_PARENT_ID = '1mrG28x7dH9yiZ1uKRhmKzmzgdenKddt6'; // 従業員フォルダを新規作成する場所（初期値）
+// 新規社員フォルダの作成先フォルダIDを取得する（未設定時はデフォルト値を返す）
 function getEmployeeParentId() {
   var v = PropertiesService.getScriptProperties().getProperty('EMPLOYEE_PARENT_ID');
   return v || DEFAULT_EMPLOYEE_PARENT_ID;
 }
 
 var DEFAULT_RETENTION_DAYS = 1826; // 初期値：5年（法令に応じて管理者が変更してください）
+// 削除予定データの保持日数を取得する（未設定時はデフォルト値を返す）
 function getRetentionDays() {
   var v = PropertiesService.getScriptProperties().getProperty('RETENTION_DAYS');
   return v ? parseInt(v) : DEFAULT_RETENTION_DAYS;
 }
+// "YYYY-MM-DD"形式の日付文字列に日数を加算し、同形式の文字列で返す
 function addDaysToDateString(dateStr, days) {
   var d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + days);
@@ -20,6 +23,7 @@ function addDaysToDateString(dateStr, days) {
   var day = ('0' + d.getDate()).slice(-2);
   return y + '-' + m + '-' + day;
 }
+// 今日の日付を"YYYY-MM-DD"形式の文字列で返す
 function todayDateString() {
   var d = new Date();
   var y = d.getFullYear();
@@ -27,6 +31,7 @@ function todayDateString() {
   var day = ('0' + d.getDate()).slice(-2);
   return y + '-' + m + '-' + day;
 }
+// システムイベントを「操作ログ」ドキュメントに1行追記する
 function logSystemEvent(eventType, detail) {
   var logDoc = getOrCreateMasterDoc('操作ログ');
   var logLine = new Date().toISOString() + ':system:system:' + eventType + ':' + detail.replace(/\n/g, ' ');
@@ -35,6 +40,7 @@ function logSystemEvent(eventType, detail) {
 var BOOTSTRAP_DOC_ID = '15GaNuDtOCUW311AS-dKXSbu7x2-mVGHblkIe25KlY4I'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
 var APP_VERSION_GAS = '2026.07.13.1'; // このGASコードの版数。デプロイのたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
 
+// マスターフォルダ（管理情報等を格納する親フォルダ）のIDを取得する（未設定時はデフォルト値を返す）
 function getMasterFolderId() {
   var v = PropertiesService.getScriptProperties().getProperty('MASTER_FOLDER_ID');
   return v || DEFAULT_MASTER_FOLDER_ID;
@@ -43,22 +49,26 @@ var MASTER_FOLDER_ID = getMasterFolderId();
 
 var DEFAULT_INQUIRY_EMAIL = 'a_aoyama@dsbz.jp';
 var DEFAULT_INQUIRY_NAME = '青山';
+// お問い合わせの受信先メールアドレスを取得する（未設定時はデフォルト値を返す）
 function getInquiryEmail() {
   var v = PropertiesService.getScriptProperties().getProperty('INQUIRY_EMAIL');
   return v || DEFAULT_INQUIRY_EMAIL;
 }
+// お問い合わせの受信者名を取得する（未設定時はデフォルト値を返す）
 function getInquiryName() {
   var v = PropertiesService.getScriptProperties().getProperty('INQUIRY_NAME');
   return v || DEFAULT_INQUIRY_NAME;
 }
 
 var DEFAULT_TRANSPORT_EMAIL = 'a_aoyama@dsbz.jp';
+// 交通費申請の受信先メールアドレスを取得する（未設定時はデフォルト値を返す）
 function getTransportEmail() {
   var v = PropertiesService.getScriptProperties().getProperty('TRANSPORT_EMAIL');
   return v || DEFAULT_TRANSPORT_EMAIL;
 }
 
 var DEFAULT_LEAVE_TYPE_EMAIL = 'a_aoyama@dsbz.jp';
+// 休暇制度申請の受信先メールアドレスを取得する（未設定時はデフォルト値を返す）
 function getLeaveTypeEmail() {
   var v = PropertiesService.getScriptProperties().getProperty('LEAVE_TYPE_EMAIL');
   return v || DEFAULT_LEAVE_TYPE_EMAIL;
@@ -75,11 +85,13 @@ var TRANSPORT_TRIP_HEADER_ROW = 4;
 var TRANSPORT_TRIP_START_ROW = 5;
 var TRANSPORT_TRIP_MAX_ROWS = 31; // 原紙の行5〜35（合計行は36）
 
+// マスターフォルダ直下の「交通費申請」フォルダを探す（無ければnull）
 function findTransportFolder() {
   var masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
   var it = masterFolder.getFoldersByName(TRANSPORT_FOLDER_NAME);
   return it.hasNext() ? it.next() : null;
 }
+// マスターフォルダ直下にある交通費申請書の原紙（スプレッドシート）を探す
 function findTransportTemplateFile() {
   // 原紙はリクエストごとのコピー置き場（交通費申請フォルダ）ではなく、管理情報などと同じマスターフォルダ直下に置く運用
   var masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
@@ -90,6 +102,7 @@ function findTransportTemplateFile() {
   }
   return null;
 }
+// 交通費申請フォルダ内の「交通費申請一覧」ドキュメントを取得し、無ければ新規作成する
 function getOrCreateTransportLedgerDoc(transportFolder) {
   var it = transportFolder.getFilesByName(TRANSPORT_LEDGER_NAME);
   while (it.hasNext()) {
@@ -108,10 +121,12 @@ function getOrCreateTransportLedgerDoc(transportFolder) {
 function encodeTransportPayload(obj) {
   return Utilities.base64Encode(JSON.stringify(obj), Utilities.Charset.UTF_8);
 }
+// base64化された交通費申請のペイロード（trips等のJSON）をデコードして返す
 function decodeTransportPayload(b64) {
   if (!b64) return null;
   try { return JSON.parse(Utilities.newBlob(Utilities.base64Decode(b64, Utilities.Charset.UTF_8)).getDataAsString('UTF-8')); } catch (e) { return null; }
 }
+// 交通費申請一覧の1行（コロン区切りテキスト）をパースしてオブジェクトに変換する
 function parseTransportLedgerLine(line) {
   var parts = line.split(':');
   if (parts.length < 8) return null;
@@ -127,6 +142,7 @@ function parseTransportLedgerLine(line) {
     sheetFileId: payload.sheetFileId || '', sheetUrl: payload.sheetUrl || ''
   };
 }
+// 交通費申請データをコロン区切りの1行テキストにシリアライズする
 function serializeTransportLedgerLine(r) {
   // appliedAt/decidedAtはISO日時（コロンを含む）なので、コロン区切りの行フォーマットと衝突しないようbase64化する
   var appliedAtB64 = Utilities.base64Encode(r.appliedAt || '', Utilities.Charset.UTF_8);
@@ -136,6 +152,7 @@ function serializeTransportLedgerLine(r) {
   return [r.requestId, r.empId, r.empName, appliedAtB64, r.status, decidedAtB64, reasonB64, payloadB64].join(':');
 }
 
+// 指定フォルダ内の「給与明細設定値」ドキュメントを探す
 function getSettingsDocFile(folder) {
   for (var i = 0; i < SETTINGS_DOC_NAME_CANDIDATES.length; i++) {
     var it = folder.getFilesByName(SETTINGS_DOC_NAME_CANDIDATES[i]);
@@ -147,6 +164,7 @@ function getSettingsDocFile(folder) {
   return null;
 }
 
+// マスターフォルダ直下の「管理情報」または「社員一覧」ドキュメントを探す
 function findMasterListFile() {
   var masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
   var candidates = ['管理情報', '社員一覧'];
@@ -160,6 +178,7 @@ function findMasterListFile() {
   return null;
 }
 
+// ドキュメント内から指定タイトルのタブを探し、その本文（Body）を返す
 function getTabBodyByTitle(doc, title) {
   var tabs = doc.getTabs();
   for (var i = 0; i < tabs.length; i++) {
@@ -168,10 +187,12 @@ function getTabBodyByTitle(doc, title) {
   return null;
 }
 
+// 文字列から数字以外の文字を取り除く
 function digitsOnly(s) {
   return (s || '').replace(/[^0-9]/g, '');
 }
 
+// 「ユーザー情報」タブのテキストを、ユーザーIDごとのレコード配列にパースする
 function parseUserRecords(text) {
   var lines = text.split('\n');
   var records = [];
@@ -194,6 +215,7 @@ function parseUserRecords(text) {
   return records;
 }
 
+// ユーザーレコード配列を「ユーザー情報」タブ用のテキストにシリアライズする
 function serializeUserRecords(records) {
   var lines = [];
   records.forEach(function(r, idx) {
@@ -215,6 +237,7 @@ function serializeUserRecords(records) {
   return lines.join('\n');
 }
 
+// 「社員一覧」テキストから対象IDの行を検索する
 function findMainListRow(mainText, targetId) {
   var rows = mainText.split('\n');
   for (var i = 0; i < rows.length; i++) {
@@ -229,6 +252,7 @@ function findMainListRow(mainText, targetId) {
   return null;
 }
 
+// マスターフォルダ内の指定名のドキュメントを取得し、無ければ新規作成する
 function getOrCreateMasterDoc(name) {
   var masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
   var it = masterFolder.getFilesByName(name);
@@ -243,6 +267,7 @@ function getOrCreateMasterDoc(name) {
   return newDoc;
 }
 
+// ドキュメント本文に1行追記して保存する
 function appendLine(doc, line) {
   var body = doc.getBody();
   body.appendParagraph(line);
@@ -272,6 +297,7 @@ function parseCompanySettingsFromText(text) {
   return result;
 }
 
+// テキストから「給料日特例」セクションのみを抜き出してキー・値としてパースする
 function parsePaydayOverrides(text) {
   var lines = text.split('\n');
   var overrides = {};
@@ -289,6 +315,7 @@ function parsePaydayOverrides(text) {
   return overrides;
 }
 
+// （旧ドキュメント形式）対象ユーザーの基本情報・有給残日数などをまとめて構築する
 function buildUserDetails(docS, mainTextS, targetIdS) {
   var rowS = findMainListRow(mainTextS, targetIdS);
   if (!rowS) return null;
@@ -380,6 +407,7 @@ function getOrCreateLeaveTypesSheet(ss) {
 
 // 「必要書類リスト」シート：休暇申請時の必要書類ドロップダウンの選択肢を管理
 var DEFAULT_REQUIRED_DOCUMENTS = ['住民票（写し）', 'マイナンバーカード（両面コピー）', '母子健康手帳（写し）', '診断書', '医師の意見書', '介護保険被保険者証（写し）', '戸籍謄本', '在職証明書'];
+// 「必要書類リスト」シートを取得し、無ければ作成してデフォルトの書類名を登録する
 function getOrCreateRequiredDocumentsSheet(ss) {
   var sheet = ss.getSheetByName('必要書類リスト');
   if (sheet) return sheet;
@@ -391,6 +419,7 @@ function getOrCreateRequiredDocumentsSheet(ss) {
   return sheet;
 }
 
+// マスターフォルダ直下の「管理情報」スプレッドシートを探す（.xlsx変換後のファイル名にも対応）
 function findMasterSpreadsheetFile() {
   var masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
   // Driveへ.xlsxをアップロードしてGoogleスプレッドシートへ自動変換した場合、
@@ -406,6 +435,7 @@ function findMasterSpreadsheetFile() {
   return null;
 }
 
+// 「管理情報」スプレッドシートを開く（見つからなければnull）
 function openMasterSpreadsheet() {
   var f = findMasterSpreadsheetFile();
   return f ? SpreadsheetApp.openById(f.getId()) : null;
@@ -422,6 +452,7 @@ function appendRowAsText(sheet, values) {
   range.setValues([values]);
   range.setHorizontalAlignment('left');
 }
+// 指定セルをテキスト書式にしてから値を書き込む（日付等の自動変換を防ぐ）
 function setCellAsText(sheet, row, col, value) {
   var range = sheet.getRange(row, col);
   range.setNumberFormat('@');
@@ -429,6 +460,7 @@ function setCellAsText(sheet, row, col, value) {
   range.setValue(value);
   range.setHorizontalAlignment('left');
 }
+// 指定範囲をテキスト書式にしてから値を書き込む（日付等の自動変換を防ぐ）
 function setRangeAsText(sheet, row, col, numRows, numCols, values) {
   var range = sheet.getRange(row, col, numRows, numCols);
   range.setNumberFormat('@');
@@ -437,6 +469,7 @@ function setRangeAsText(sheet, row, col, numRows, numCols, values) {
   range.setHorizontalAlignment('left');
 }
 
+// 指定シートのヘッダー行とデータ行を取得する
 function getSheetData(ss, sheetName) {
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) return { sheet: null, header: [], rows: [] };
@@ -446,6 +479,7 @@ function getSheetData(ss, sheetName) {
   return { sheet: sheet, header: values[0], rows: values.slice(1) };
 }
 
+// ヘッダー配列と行配列から、ヘッダー名をキーとするオブジェクトを作る
 function rowToObject(header, row) {
   var obj = {};
   for (var i = 0; i < header.length; i++) obj[String(header[i]).trim()] = row[i];
@@ -517,6 +551,7 @@ function findEmployeeRowSS(ss, targetId) {
   return null;
 }
 
+// 「ユーザー情報」シートから該当ユーザーIDの行を検索する
 function findUserInfoRowSS(ss, targetId) {
   var data = getSheetData(ss, 'ユーザー情報');
   for (var i = 0; i < data.rows.length; i++) {
@@ -527,6 +562,7 @@ function findUserInfoRowSS(ss, targetId) {
   return null;
 }
 
+// 「会社共通設定」シートをキー・値のオブジェクトとして読み込む
 function readCompanySettingsSS(ss) {
   var data = getSheetData(ss, '会社共通設定');
   var result = {};
@@ -537,6 +573,7 @@ function readCompanySettingsSS(ss) {
   return result;
 }
 
+// 「給料日特例」シートをキー・値のオブジェクトとして読み込む
 function readPaydayOverridesSS(ss) {
   var data = getSheetData(ss, '給料日特例');
   var result = {};
@@ -547,6 +584,7 @@ function readPaydayOverridesSS(ss) {
   return result;
 }
 
+// （スプレッドシート形式）対象社員の基本情報・有給残日数・個別付与設定などをまとめて構築する
 function buildUserDetailsSS(ss, targetId) {
   var empRow = findEmployeeRowSS(ss, targetId);
   if (!empRow) return null;
@@ -591,6 +629,7 @@ function buildUserDetailsSS(ss, targetId) {
   return { id: targetId, folderId: empRow.folderId, userInfo: userInfo, byYear: byYear, individualGrantDate: individualGrantDate, individualGrantDays: individualGrantDays };
 }
 
+// クライアントからのGETリクエストを受け取り、actionパラメータに応じて処理を振り分けるエントリーポイント（JSONPで返却）
 function doGet(e) {
   var action = e.parameter.action;
   var callback = e.parameter.callback;
