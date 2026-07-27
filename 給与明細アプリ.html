@@ -4780,7 +4780,7 @@ function doGet(e) {
       var lrReason = e.parameter.reason || '（未入力）';
       var lrSubject = '給与台帳：有給申請';
       var lrBody = lrEmpName + 'さんから有給申請が届きました。' + lrDate + '。理由：' + lrReason + 'のため。内容を確認し、アプリより、有給許可を行ってください。\\n※本メールは給与台帳より自動送信されています。';
-      MailApp.sendEmail(getInquiryEmail(), lrSubject, lrBody);
+      MailApp.sendEmail(getLeaveTypeEmail(), lrSubject, lrBody);
       out = {success: true};
     } else if (action === 'uploadChunkStart') {
       var upFolder = DriveApp.getFolderById(e.parameter.folder);
