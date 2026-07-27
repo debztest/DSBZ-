@@ -7661,14 +7661,20 @@ document.getElementById('ot-month').addEventListener('change', ()=>{
   renderOvertime();
 });
 document.getElementById('ot-hours').addEventListener('input', renderOvertime);
-document.getElementById('ot-save').addEventListener('click', async ()=>{
+document.getElementById('ot-save').addEventListener('click', async (ev)=>{
   const monthStr = document.getElementById('ot-month').value || currentMonthStr();
   otHoursByMonth[monthStr] = parseFloat(document.getElementById('ot-hours').value)||0;
   saveJSON('otHoursByMonth', otHoursByMonth);
   renderOvertime();
   renderSummary();
   renderSalaryChart();
-  if(settings.scriptUrl && settings.driveFolderId) await pushSettingsToDrive();
+  const btn = ev.currentTarget;
+  const orig = btn.textContent;
+  await withButtonBusy(btn, async ()=>{
+    if(settings.scriptUrl && settings.driveFolderId) await pushSettingsToDrive();
+  });
+  btn.textContent = '保存しました';
+  setTimeout(()=>{ btn.textContent = orig; }, 2000);
 });
 
 function formatYen(v){
