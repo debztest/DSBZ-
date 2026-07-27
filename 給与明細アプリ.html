@@ -7844,7 +7844,7 @@ function renderSalaryChart(){
         salaryChartDetails.push({
           type: 'salary',
           label: e.salaries.length>1 ? `${e.y}年${e.m}月度${CIRCLED_NUMS[si]||('('+(si+1)+')')}` : `${e.y}年${e.m}月度`,
-          base: sal.base, otPay: sal.otPay, total: sal.total, isEstimate: sal.isEstimate, payKey: sal.payKey
+          base: sal.base, otPay: sal.otPay, total: sal.total, net: sal.net, isEstimate: sal.isEstimate, payKey: sal.payKey
         });
         svg += `<g class="chart-bar-group" data-detail-idx="${detailIdx}" style="cursor:pointer;">`;
         svg += `<rect x="${sx}" y="${padTop}" width="${subW}" height="${H-padTop-padBottom}" fill="transparent"/>`;
@@ -7891,7 +7891,8 @@ document.getElementById('salary-chart').addEventListener('click', (ev)=>{
     rowsEl.innerHTML = `
       <div class="row mt-8"><span class="muted">基本給</span><span class="mono">${formatYen(detail.base)}</span></div>
       <div class="row mt-8"><span class="muted">残業代</span><span class="mono">${formatYen(detail.otPay)}</span></div>
-      <div class="row mt-8"><span class="muted">総支給額</span><span class="mono" style="font-weight:700;">${formatYen(detail.total)}</span></div>
+      <div class="row mt-8"><span class="muted">総支給額</span><span class="mono">${formatYen(detail.total)}</span></div>
+      <div class="row mt-8"><span class="muted">差引支給額</span><span class="mono" style="font-weight:700;">${formatYen(detail.net !== undefined && detail.net !== null ? detail.net : detail.total)}</span></div>
       ${detail.isEstimate ? '<p class="muted mt-8" style="font-size:11px;">※実績未登録のため、設定値からの見込み額です。</p>' : ''}
     `;
   }else{
