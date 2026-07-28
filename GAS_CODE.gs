@@ -744,8 +744,8 @@ function doGet(e) {
       var lrEmpName = e.parameter.empName || '';
       var lrDate = e.parameter.date || '';
       var lrReason = e.parameter.reason || '（未入力）';
-      var lrSubject = '給与台帳：有給申請';
-      var lrBody = lrEmpName + 'さんから有給申請が届きました。' + lrDate + '。理由：' + lrReason + 'のため。内容を確認し、アプリより、有給許可を行ってください。\n※本メールは給与台帳より自動送信されています。';
+      var lrSubject = 'DSBZ給与：有給申請';
+      var lrBody = lrEmpName + 'さんから有給申請が届きました。' + lrDate + '。理由：' + lrReason + 'のため。内容を確認し、アプリより、有給許可を行ってください。\n※本メールはDSBZ給与より自動送信されています。';
       MailApp.sendEmail(getLeaveTypeEmail(), lrSubject, lrBody);
       out = {success: true};
     } else if (action === 'uploadChunkStart') {
@@ -1573,7 +1573,7 @@ function doGet(e) {
           + '期間：' + periodAL + '\n'
           + (reasonAL ? ('理由・備考：' + reasonAL + '\n') : '')
           + '\n必要書類：' + (docsSummaryAL || 'なし');
-        MailApp.sendEmail(getLeaveTypeEmail(), '【給与台帳】休暇制度の申請：' + nameAL, bodyAL);
+        MailApp.sendEmail(getLeaveTypeEmail(), '【DSBZ給与】休暇制度の申請：' + nameAL, bodyAL);
         out = { success: true };
       }
     } else if (action === 'updateMasterFolderId') {
@@ -1648,8 +1648,8 @@ function doGet(e) {
             appendLine(newsDocT, [newsIdT, 'admin', 'critical', '交通費申請', '', '', TRANSPORT_REQUEST_MARKER + newsPayloadT].join(':'));
 
             try {
-              var mailBodyT = (tEmpName || tEmpId) + '（' + tEmpId + '）さんから交通費申請が届きました。\n件数：' + trips.length + '件\n合計金額：' + totalT + '円\n\nアプリより内容を確認し、承認・却下を行ってください。\n※本メールは給与台帳より自動送信されています。';
-              MailApp.sendEmail(getTransportEmail(), '給与台帳：交通費申請', mailBodyT);
+              var mailBodyT = (tEmpName || tEmpId) + '（' + tEmpId + '）さんから交通費申請が届きました。\n件数：' + trips.length + '件\n合計金額：' + totalT + '円\n\nアプリより内容を確認し、承認・却下を行ってください。\n※本メールはDSBZ給与より自動送信されています。';
+              MailApp.sendEmail(getTransportEmail(), 'DSBZ給与：交通費申請', mailBodyT);
             } catch (mailErrT) { /* メール送信失敗は申請自体の成功を妨げない */ }
 
             logSystemEvent('transport_request', tEmpId + ':' + tEmpName + ' が交通費申請（' + trips.length + '件・' + totalT + '円）');
