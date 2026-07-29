@@ -80,6 +80,12 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .summary-table td{padding:12px 0;font-size:13px;}
 .summary-table td.label{color:var(--text-2);}
 .summary-table td.val{text-align:right;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;}
+.commute-legs-table-wrap{overflow-x:auto;}
+.commute-legs-table{width:100%;border-collapse:collapse;margin-top:4px;}
+.commute-legs-table th{font-size:11px;color:var(--text-2);font-weight:600;text-align:left;padding:0 4px 4px;}
+.commute-legs-table td{padding:3px 3px;vertical-align:middle;}
+.commute-legs-table td:last-child{width:26px;text-align:center;}
+.commute-legs-table input[type=text]{padding:8px 8px;font-size:13px;}
 .ledger-row{display:flex;align-items:center;gap:12px;padding:13px 0 13px 8px;border-bottom:1px solid var(--border);border-radius:8px;transition:background .15s ease,color .15s ease;}
 .ledger-row:last-child{border-bottom:none;}
 .ledger-row .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;transition:background .15s ease;}
@@ -829,10 +835,20 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
           <option value="bicycle">自転車</option>
         </select>
         <div id="commute-train-fields">
-          <label class="field">区間</label>
-          <input type="text" id="commute-section" placeholder="例：横浜〜東京">
-          <label class="field">片道料金（円）</label>
-          <input type="text" inputmode="numeric" id="commute-one-way" placeholder="410">
+          <label class="field">区間（乗り換えがある場合は行を追加してください）</label>
+          <div class="commute-legs-table-wrap">
+            <table class="commute-legs-table">
+              <thead>
+                <tr><th>区間</th><th>片道料金（円）</th><th></th></tr>
+              </thead>
+              <tbody id="commute-legs-tbody"></tbody>
+            </table>
+          </div>
+          <button class="btn ghost small w-full mt-8" id="btn-commute-leg-add">＋ 区間を追加</button>
+          <div class="row mt-8">
+            <span class="muted">片道合計</span>
+            <span class="mono" id="commute-one-way-total">¥0</span>
+          </div>
           <div class="row mt-8">
             <span class="muted">往復料金（自動計算）</span>
             <span class="mono" id="commute-round-trip">¥0</span>
@@ -3653,13 +3669,58 @@ function commuteModeLabel(mode){
   if(mode === 'bicycle') return '自転車';
   return mode;
 }
+let commuteLegs = [];
+function newCommuteLeg(){
+  return { section: '', oneWay: '' };
+}
+function commuteLegsOneWayTotal(){
+  return commuteLegs.reduce((s,l)=>s+(parseAmount(l.oneWay)||0), 0);
+}
+function renderCommuteLegRows(){
+  const tbody = document.getElementById('commute-legs-tbody');
+  tbody.innerHTML = commuteLegs.map((l,i)=>`
+    <tr>
+      <td><input type="text" data-leg-field="section" data-idx="${i}" value="${l.section}" placeholder="例：横浜〜渋谷"></td>
+      <td><input type="text" inputmode="numeric" data-leg-field="oneWay" data-idx="${i}" value="${l.oneWay}" placeholder="150"></td>
+      <td><button class="x-btn" data-remove-leg="${i}" ${commuteLegs.length<=1 ? 'style="visibility:hidden;"' : ''}>×</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-leg-field]').forEach(elx=>{
+    elx.addEventListener('input', ()=>{
+      const idx = parseInt(elx.dataset.idx, 10);
+      let val = elx.value;
+      if(elx.dataset.legField === 'oneWay'){
+        const raw = val.replace(/[^\d]/g,'');
+        val = raw === '' ? '' : parseInt(raw,10).toLocaleString('en-US');
+        elx.value = val;
+      }
+      commuteLegs[idx][elx.dataset.legField] = val;
+      updateCommuteComputedDisplay();
+    });
+  });
+  tbody.querySelectorAll('[data-remove-leg]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = parseInt(btn.dataset.removeLeg, 10);
+      if(commuteLegs.length<=1) return;
+      commuteLegs.splice(idx,1);
+      renderCommuteLegRows();
+      updateCommuteComputedDisplay();
+    });
+  });
+}
+document.getElementById('btn-commute-leg-add').addEventListener('click', ()=>{
+  if(commuteLegs.length >= 10){ showAlertModal('区間は一度に10件まで追加できます。'); return; }
+  commuteLegs.push(newCommuteLeg());
+  renderCommuteLegRows();
+});
 function updateCommuteComputedDisplay(){
   const mode = document.getElementById('commute-mode').value;
   document.getElementById('commute-train-fields').classList.toggle('is-hidden', mode !== 'train');
   document.getElementById('commute-fixed-fields').classList.toggle('is-hidden', mode === 'train');
   if(mode === 'train'){
-    const oneWay = parseAmount(document.getElementById('commute-one-way').value);
-    document.getElementById('commute-round-trip').textContent = formatYen(oneWay * 2);
+    const oneWayTotal = commuteLegsOneWayTotal();
+    document.getElementById('commute-one-way-total').textContent = formatYen(oneWayTotal);
+    document.getElementById('commute-round-trip').textContent = formatYen(oneWayTotal * 2);
   }else{
     document.getElementById('commute-fixed-label').textContent = `${commuteModeLabel(mode)}通勤：1日あたりの金額`;
     document.getElementById('commute-fixed-amount').textContent = formatYen(commuteFixedRate(mode));
@@ -3668,11 +3729,16 @@ function updateCommuteComputedDisplay(){
 function fillCommuteForm(){
   const c = settings.commute;
   document.getElementById('commute-mode').value = (c && c.mode) || 'train';
-  document.getElementById('commute-section').value = (c && c.mode === 'train') ? (c.section||'') : '';
-  document.getElementById('commute-one-way').value = (c && c.mode === 'train' && c.oneWay) ? c.oneWay.toLocaleString('en-US') : '';
+  if(c && c.mode === 'train' && c.legs && c.legs.length){
+    commuteLegs = c.legs.map(l=>({ section: l.section||'', oneWay: l.oneWay ? l.oneWay.toLocaleString('en-US') : '' }));
+  }else{
+    commuteLegs = [newCommuteLeg()];
+  }
+  renderCommuteLegRows();
   const statusEl = document.getElementById('commute-current-status');
-  if(c && c.mode === 'train'){
-    statusEl.textContent = `現在の登録内容：電車（${c.section||'（区間未入力）'}・片道${formatYen(c.oneWay||0)}）`;
+  if(c && c.mode === 'train' && c.legs && c.legs.length){
+    const legsLabel = c.legs.map(l=>`${l.section||'（区間未入力）'}：片道${formatYen(l.oneWay||0)}`).join('、');
+    statusEl.textContent = `現在の登録内容：電車（${legsLabel}）`;
   }else if(c && c.mode){
     statusEl.textContent = `現在の登録内容：${commuteModeLabel(c.mode)}（1日あたり${formatYen(commuteFixedRate(c.mode))}）`;
   }else{
@@ -3681,16 +3747,16 @@ function fillCommuteForm(){
   updateCommuteComputedDisplay();
 }
 document.getElementById('commute-mode').addEventListener('change', updateCommuteComputedDisplay);
-document.getElementById('commute-one-way').addEventListener('input', updateCommuteComputedDisplay);
 document.getElementById('btn-commute-apply').addEventListener('click', async ()=>{
   const status = document.getElementById('commute-status');
   const mode = document.getElementById('commute-mode').value;
-  let section = '', oneWay = 0;
+  let legs = [];
   if(mode === 'train'){
-    section = document.getElementById('commute-section').value.trim();
-    oneWay = parseAmount(document.getElementById('commute-one-way').value);
-    if(!section || !oneWay){
-      status.textContent = '区間と片道料金を入力してください。';
+    legs = commuteLegs
+      .map(l=>({ section: l.section.trim(), oneWay: parseAmount(l.oneWay)||0 }))
+      .filter(l=>l.section || l.oneWay);
+    if(legs.length===0 || legs.some(l=>!l.section || !l.oneWay)){
+      status.textContent = 'すべての行の区間と片道料金を入力してください。';
       return;
     }
   }
@@ -3698,10 +3764,10 @@ document.getElementById('btn-commute-apply').addEventListener('click', async ()=
   setButtonLoading(btn, '送信しています…');
   status.textContent = '';
   try{
-    const url = `${COMPANY_SCRIPT_URL}?action=sendCommutePassRequest&requestType=apply&empId=${encodeURIComponent(currentEmployeeId||'')}&empName=${encodeURIComponent(currentEmployeeName||'')}&mode=${encodeURIComponent(mode)}&section=${encodeURIComponent(section)}&oneWay=${encodeURIComponent(oneWay)}`;
+    const url = `${COMPANY_SCRIPT_URL}?action=sendCommutePassRequest&requestType=apply&empId=${encodeURIComponent(currentEmployeeId||'')}&empName=${encodeURIComponent(currentEmployeeName||'')}&mode=${encodeURIComponent(mode)}&legsJson=${encodeURIComponent(JSON.stringify(legs))}`;
     const data = await jsonpRequest(url);
     if(data.error){ status.textContent = data.error; return; }
-    settings.commute = mode === 'train' ? { mode, section, oneWay } : { mode };
+    settings.commute = mode === 'train' ? { mode, legs } : { mode };
     saveJSON('settings', settings);
     if(settings.scriptUrl && settings.driveFolderId) await pushSettingsToDrive();
     fillCommuteForm();
@@ -4987,16 +5053,23 @@ function doGet(e) {
       var cpRequestType = e.parameter.requestType || 'apply';
       var cpMode = e.parameter.mode || '';
       var cpModeLabel = cpMode === 'train' ? '電車' : (cpMode === 'car' ? '車' : (cpMode === 'bicycle' ? '自転車' : cpMode));
-      var cpSection = e.parameter.section || '';
-      var cpOneWay = e.parameter.oneWay || '';
+      var cpLegs = [];
+      try { cpLegs = JSON.parse(e.parameter.legsJson || '[]'); } catch (cpParseErr) { cpLegs = []; }
       var cpSubject, cpBody;
       if (cpRequestType === 'cancel') {
         cpSubject = 'DSBZ給与：定期代申請取消';
         cpBody = cpEmpName + '（' + cpEmpId + '）さんが定期代の申請を取り消しました。\\n内容を確認し、給与計算への反映をご確認ください。\\n※本メールはDSBZ給与より自動送信されています。';
       } else {
+        var cpOneWayTotal = 0;
+        var cpLegsText = '';
+        cpLegs.forEach(function (leg, idx) {
+          var legOneWay = parseInt(leg.oneWay, 10) || 0;
+          cpOneWayTotal += legOneWay;
+          cpLegsText += (idx + 1) + '. ' + (leg.section || '') + '：片道' + legOneWay + '円\\n';
+        });
         cpSubject = 'DSBZ給与：定期代申請';
         cpBody = cpEmpName + '（' + cpEmpId + '）さんから定期代の申請/変更が届きました。\\n\\n通勤手段：' + cpModeLabel + '\\n'
-          + (cpMode === 'train' ? ('区間：' + cpSection + '\\n片道料金：' + cpOneWay + '円\\n往復料金：' + ((parseInt(cpOneWay, 10) || 0) * 2) + '円\\n') : '')
+          + (cpMode === 'train' ? ('\\n' + cpLegsText + '\\n片道合計：' + cpOneWayTotal + '円\\n往復料金：' + (cpOneWayTotal * 2) + '円\\n') : '')
           + '\\nアプリより内容を確認し、給与計算への反映をお願いします。\\n※本メールはDSBZ給与より自動送信されています。';
       }
       MailApp.sendEmail(getTransportEmail(), cpSubject, cpBody);
@@ -7111,9 +7184,10 @@ function serializeSettingsText(){
   lines.push('');
   if(settings.commute && settings.commute.mode){
     const c = settings.commute;
-    if(c.mode === 'train'){
-      lines.push(`定期代:train:${c.section||''}|${c.oneWay||0}`);
-    }else{
+    if(c.mode === 'train' && c.legs && c.legs.length){
+      const legsStr = c.legs.map(l=>`${(l.section||'').replace(/[|;]/g,'')}|${l.oneWay||0}`).join(';;');
+      lines.push(`定期代:train:${legsStr}`);
+    }else if(c.mode !== 'train'){
       lines.push(`定期代:${c.mode}`);
     }
   }
@@ -7229,8 +7303,13 @@ function parseSettingsText(text){
       result.settings.bonusMonth2 = parseInt(m[1]);
     }else if(m = line.match(/^賞与日2:(\d+)/)){
       result.settings.bonusDay2 = parseInt(m[1]);
-    }else if(m = line.match(/^定期代:train:([^|]*)\|([\d.]+)$/)){
-      result.settings.commute = { mode: 'train', section: m[1], oneWay: parseFloat(m[2]) };
+    }else if(m = line.match(/^定期代:train:(.+)$/)){
+      const legs = m[1].split(';;').map(part=>{
+        const sep = part.lastIndexOf('|');
+        if(sep === -1) return null;
+        return { section: part.slice(0, sep), oneWay: parseFloat(part.slice(sep+1)) || 0 };
+      }).filter(Boolean);
+      if(legs.length) result.settings.commute = { mode: 'train', legs };
     }else if(m = line.match(/^定期代:(car|bicycle)$/)){
       result.settings.commute = { mode: m[1] };
     }else if(m = line.match(/^(\d{4})有給残:([\d.]+)$/)){

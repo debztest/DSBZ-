@@ -754,16 +754,23 @@ function doGet(e) {
       var cpRequestType = e.parameter.requestType || 'apply';
       var cpMode = e.parameter.mode || '';
       var cpModeLabel = cpMode === 'train' ? '電車' : (cpMode === 'car' ? '車' : (cpMode === 'bicycle' ? '自転車' : cpMode));
-      var cpSection = e.parameter.section || '';
-      var cpOneWay = e.parameter.oneWay || '';
+      var cpLegs = [];
+      try { cpLegs = JSON.parse(e.parameter.legsJson || '[]'); } catch (cpParseErr) { cpLegs = []; }
       var cpSubject, cpBody;
       if (cpRequestType === 'cancel') {
         cpSubject = 'DSBZ給与：定期代申請取消';
         cpBody = cpEmpName + '（' + cpEmpId + '）さんが定期代の申請を取り消しました。\n内容を確認し、給与計算への反映をご確認ください。\n※本メールはDSBZ給与より自動送信されています。';
       } else {
+        var cpOneWayTotal = 0;
+        var cpLegsText = '';
+        cpLegs.forEach(function (leg, idx) {
+          var legOneWay = parseInt(leg.oneWay, 10) || 0;
+          cpOneWayTotal += legOneWay;
+          cpLegsText += (idx + 1) + '. ' + (leg.section || '') + '：片道' + legOneWay + '円\n';
+        });
         cpSubject = 'DSBZ給与：定期代申請';
         cpBody = cpEmpName + '（' + cpEmpId + '）さんから定期代の申請/変更が届きました。\n\n通勤手段：' + cpModeLabel + '\n'
-          + (cpMode === 'train' ? ('区間：' + cpSection + '\n片道料金：' + cpOneWay + '円\n往復料金：' + ((parseInt(cpOneWay, 10) || 0) * 2) + '円\n') : '')
+          + (cpMode === 'train' ? ('\n' + cpLegsText + '\n片道合計：' + cpOneWayTotal + '円\n往復料金：' + (cpOneWayTotal * 2) + '円\n') : '')
           + '\nアプリより内容を確認し、給与計算への反映をお願いします。\n※本メールはDSBZ給与より自動送信されています。';
       }
       MailApp.sendEmail(getTransportEmail(), cpSubject, cpBody);
