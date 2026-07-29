@@ -815,6 +815,44 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <button class="btn mt-12" id="btn-transport-submit">申請する</button>
       <p class="muted mt-8" id="transport-submit-status"></p>
     </div>
+    <div class="card" id="card-commute-pass">
+      <div class="row mb-2">
+        <div class="section-title mb-0">定期代の申請/変更</div>
+        <button class="btn ghost small collapsible-toggle">開く</button>
+      </div>
+      <div class="collapsible-body is-hidden">
+        <p class="muted mt-0">通勤手段を選択し、内容を入力してください。</p>
+        <label class="field mt-0">通勤手段</label>
+        <select id="commute-mode">
+          <option value="train">電車</option>
+          <option value="car">車</option>
+          <option value="bicycle">自転車</option>
+        </select>
+        <div id="commute-train-fields">
+          <label class="field">区間</label>
+          <input type="text" id="commute-section" placeholder="例：横浜〜東京">
+          <label class="field">片道料金（円）</label>
+          <input type="text" inputmode="numeric" id="commute-one-way" placeholder="410">
+          <div class="row mt-8">
+            <span class="muted">往復料金（自動計算）</span>
+            <span class="mono" id="commute-round-trip">¥0</span>
+          </div>
+        </div>
+        <div id="commute-fixed-fields" class="is-hidden">
+          <div class="row mt-8">
+            <span class="muted" id="commute-fixed-label">1日あたりの金額</span>
+            <span class="mono" id="commute-fixed-amount">¥0</span>
+          </div>
+          <p class="muted fs-11 mt-6">金額は設定タブの「支払い・有給ルール」で管理者が変更できます。</p>
+        </div>
+        <p class="muted mt-8" id="commute-current-status"></p>
+        <div class="news-detail-actions mt-12">
+          <button class="btn ghost" id="btn-commute-cancel">申請取消</button>
+          <button class="btn" id="btn-commute-apply">申請/変更</button>
+        </div>
+        <p class="muted mt-8" id="commute-status"></p>
+      </div>
+    </div>
     <div class="card">
       <div class="section-title">申請状況・履歴</div>
       <div id="transport-my-requests"><div class="empty">申請はまだありません。</div></div>
@@ -946,6 +984,12 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <input type="date" id="set-grant-date-company">
       <label class="field">付与日数</label>
       <input type="number" id="set-grant-days-company" step="0.5" placeholder="20">
+      <div class="divider-16"></div>
+      <div class="section-title fs-13">定期代（車・自転車の固定額）</div>
+      <label class="field">車通勤（1日あたり・円）</label>
+      <input type="number" id="set-car-daily-rate" min="0" placeholder="1000">
+      <label class="field">自転車通勤（1日あたり・円）</label>
+      <input type="number" id="set-bike-daily-rate" min="0" placeholder="100">
       <button class="btn ghost small mt-8 w-full" id="btn-save-company-rules">この内容を全員に反映</button>
       <p class="muted mt-6" id="company-rules-status"></p>
       <div class="helptext">ここで変更すると、次回ログイン時から全員に反映されます（個人の基本給・有給残高などは変わりません）。土日にあたる場合は自動で前営業日に繰り上げます。祝日は判定していないため、祝日と重なる場合はご自身で読み替えてください。</div>
@@ -2333,7 +2377,17 @@ function resetPersonalDataForLogin(){
   settings.baseSalary = '';
   settings.grantDate = '';
   settings.grantDays = undefined;
+  settings.commute = undefined;
   saveJSON('settings', settings);
+  const commuteCard = document.getElementById('card-commute-pass');
+  if(commuteCard){
+    const commuteBody = commuteCard.querySelector('.collapsible-body');
+    const commuteToggle = commuteCard.querySelector('.collapsible-toggle');
+    if(commuteBody) commuteBody.classList.add('is-hidden');
+    if(commuteToggle) commuteToggle.textContent = '開く';
+  }
+  const commuteStatusEl = document.getElementById('commute-status');
+  if(commuteStatusEl) commuteStatusEl.textContent = '';
 }
 
 function applyAdminVisibility(isAdmin){
@@ -2400,6 +2454,8 @@ function applyCompanySettings(cs, paydayOverrides){
     if(cs['残業割増率']!==undefined) settings.otRate = parseFloat(cs['残業割増率']);
     if(cs['所定労働時間']!==undefined) settings.standardHours = parseFloat(cs['所定労働時間']);
     if(cs['残業時間警告基準']!==undefined) settings.otWarnHours = parseFloat(cs['残業時間警告基準']);
+    if(cs['車通勤日額']!==undefined) settings.carDailyRate = parseFloat(cs['車通勤日額']);
+    if(cs['自転車通勤日額']!==undefined) settings.bikeDailyRate = parseFloat(cs['自転車通勤日額']);
     if(cs['有給次回付与']!==undefined && cs['有給次回付与']){
       const gd = cs['有給次回付与'];
       if(/^\d{8}$/.test(gd)) settings.companyGrantDate = `${gd.slice(0,4)}-${gd.slice(4,6)}-${gd.slice(6,8)}`;
@@ -3099,7 +3155,7 @@ document.getElementById('btn-new-user-toggle').addEventListener('click', ()=>{
   document.getElementById('btn-new-user-toggle').textContent = showing ? '追加' : '閉じる';
 });
 
-['card-admin-system','card-pay-rules','card-transport-admin-summary','card-admin-special-periods','card-admin-leave-types'].forEach(cardId=>{
+['card-admin-system','card-pay-rules','card-transport-admin-summary','card-admin-special-periods','card-admin-leave-types','card-commute-pass'].forEach(cardId=>{
   const card = document.getElementById(cardId);
   if(!card) return;
   const toggleBtn = card.querySelector('.collapsible-toggle');
@@ -3110,6 +3166,9 @@ document.getElementById('btn-new-user-toggle').addEventListener('click', ()=>{
     toggleBtn.textContent = nowHidden ? '開く' : '閉じる';
     if(cardId === 'card-admin-leave-types' && !nowHidden){
       loadLeaveTypeDocOptions().then(()=>resetLeaveTypeDocRows());
+    }
+    if(cardId === 'card-commute-pass' && !nowHidden){
+      fillCommuteForm();
     }
   });
 });
@@ -3583,6 +3642,105 @@ document.getElementById('btn-transport-submit').addEventListener('click', async 
   }
 });
 
+function commuteFixedRate(mode){
+  if(mode === 'car') return settings.carDailyRate!==undefined ? settings.carDailyRate : 1000;
+  if(mode === 'bicycle') return settings.bikeDailyRate!==undefined ? settings.bikeDailyRate : 100;
+  return 0;
+}
+function commuteModeLabel(mode){
+  if(mode === 'train') return '電車';
+  if(mode === 'car') return '車';
+  if(mode === 'bicycle') return '自転車';
+  return mode;
+}
+function updateCommuteComputedDisplay(){
+  const mode = document.getElementById('commute-mode').value;
+  document.getElementById('commute-train-fields').classList.toggle('is-hidden', mode !== 'train');
+  document.getElementById('commute-fixed-fields').classList.toggle('is-hidden', mode === 'train');
+  if(mode === 'train'){
+    const oneWay = parseAmount(document.getElementById('commute-one-way').value);
+    document.getElementById('commute-round-trip').textContent = formatYen(oneWay * 2);
+  }else{
+    document.getElementById('commute-fixed-label').textContent = `${commuteModeLabel(mode)}通勤：1日あたりの金額`;
+    document.getElementById('commute-fixed-amount').textContent = formatYen(commuteFixedRate(mode));
+  }
+}
+function fillCommuteForm(){
+  const c = settings.commute;
+  document.getElementById('commute-mode').value = (c && c.mode) || 'train';
+  document.getElementById('commute-section').value = (c && c.mode === 'train') ? (c.section||'') : '';
+  document.getElementById('commute-one-way').value = (c && c.mode === 'train' && c.oneWay) ? c.oneWay.toLocaleString('en-US') : '';
+  const statusEl = document.getElementById('commute-current-status');
+  if(c && c.mode === 'train'){
+    statusEl.textContent = `現在の登録内容：電車（${c.section||'（区間未入力）'}・片道${formatYen(c.oneWay||0)}）`;
+  }else if(c && c.mode){
+    statusEl.textContent = `現在の登録内容：${commuteModeLabel(c.mode)}（1日あたり${formatYen(commuteFixedRate(c.mode))}）`;
+  }else{
+    statusEl.textContent = '現在、定期代の登録はありません。';
+  }
+  updateCommuteComputedDisplay();
+}
+document.getElementById('commute-mode').addEventListener('change', updateCommuteComputedDisplay);
+document.getElementById('commute-one-way').addEventListener('input', updateCommuteComputedDisplay);
+document.getElementById('btn-commute-apply').addEventListener('click', async ()=>{
+  const status = document.getElementById('commute-status');
+  const mode = document.getElementById('commute-mode').value;
+  let section = '', oneWay = 0;
+  if(mode === 'train'){
+    section = document.getElementById('commute-section').value.trim();
+    oneWay = parseAmount(document.getElementById('commute-one-way').value);
+    if(!section || !oneWay){
+      status.textContent = '区間と片道料金を入力してください。';
+      return;
+    }
+  }
+  const btn = document.getElementById('btn-commute-apply');
+  setButtonLoading(btn, '送信しています…');
+  status.textContent = '';
+  try{
+    const url = `${COMPANY_SCRIPT_URL}?action=sendCommutePassRequest&requestType=apply&empId=${encodeURIComponent(currentEmployeeId||'')}&empName=${encodeURIComponent(currentEmployeeName||'')}&mode=${encodeURIComponent(mode)}&section=${encodeURIComponent(section)}&oneWay=${encodeURIComponent(oneWay)}`;
+    const data = await jsonpRequest(url);
+    if(data.error){ status.textContent = data.error; return; }
+    settings.commute = mode === 'train' ? { mode, section, oneWay } : { mode };
+    saveJSON('settings', settings);
+    if(settings.scriptUrl && settings.driveFolderId) await pushSettingsToDrive();
+    fillCommuteForm();
+    logEvent('commute_request', `定期代の申請/変更（${commuteModeLabel(mode)}）`);
+    status.textContent = '申請しました。';
+  }catch(e){
+    status.textContent = '申請に失敗しました：' + e.message;
+  }finally{
+    clearButtonLoading(btn);
+  }
+});
+document.getElementById('btn-commute-cancel').addEventListener('click', async ()=>{
+  const status = document.getElementById('commute-status');
+  if(!settings.commute || !settings.commute.mode){
+    status.textContent = '現在、登録されている定期代はありません。';
+    return;
+  }
+  if(!(await showConfirmModal('定期代の申請を取り消しますか？'))) return;
+  const mode = settings.commute.mode;
+  const btn = document.getElementById('btn-commute-cancel');
+  setButtonLoading(btn, '送信しています…');
+  status.textContent = '';
+  try{
+    const url = `${COMPANY_SCRIPT_URL}?action=sendCommutePassRequest&requestType=cancel&empId=${encodeURIComponent(currentEmployeeId||'')}&empName=${encodeURIComponent(currentEmployeeName||'')}&mode=${encodeURIComponent(mode)}`;
+    const data = await jsonpRequest(url);
+    if(data.error){ status.textContent = data.error; return; }
+    settings.commute = undefined;
+    saveJSON('settings', settings);
+    if(settings.scriptUrl && settings.driveFolderId) await pushSettingsToDrive();
+    fillCommuteForm();
+    logEvent('commute_request_cancel', `定期代の申請取消（${commuteModeLabel(mode)}）`);
+    status.textContent = '申請を取り消しました。';
+  }catch(e){
+    status.textContent = '取消に失敗しました：' + e.message;
+  }finally{
+    clearButtonLoading(btn);
+  }
+});
+
 function transportStatusLabel(status){
   if(status==='approved') return '許諾済み';
   if(status==='rejected') return '不許可';
@@ -3834,7 +3992,9 @@ document.getElementById('btn-save-company-rules').addEventListener('click', asyn
     '賞与月2': String(document.getElementById('set-bonus-month2').value || '12').padStart(2,'0'),
     '賞与日2': String(document.getElementById('set-bonus-day2').value || '0').padStart(2,'0'),
     '残業時間警告基準': document.getElementById('set-ot-warn-company').value || '45',
-    '付与数': document.getElementById('set-grant-days-company').value || '20'
+    '付与数': document.getElementById('set-grant-days-company').value || '20',
+    '車通勤日額': document.getElementById('set-car-daily-rate').value || '1000',
+    '自転車通勤日額': document.getElementById('set-bike-daily-rate').value || '100'
   };
   if(grantDateRaw) updates['有給次回付与'] = grantDateRaw.replace(/-/g,'');
   status.textContent = '保存しています…';
@@ -4347,7 +4507,7 @@ function appendLine(doc, line) {
   doc.saveAndClose();
 }
 
-var COMPANY_SETTING_KEYS = ['有給次回付与', '付与数', '給料日', '締日', '賞与月1', '賞与日1', '賞与月2', '賞与日2', '残業時間警告基準'];
+var COMPANY_SETTING_KEYS = ['有給次回付与', '付与数', '給料日', '締日', '賞与月1', '賞与日1', '賞与月2', '賞与日2', '残業時間警告基準', '車通勤日額', '自転車通勤日額'];
 // 「会社共通設定」ヘッダーが無い旧形式のドキュメントでも設定値を読み取れるよう、
 // ヘッダーの有無に関わらずキー名で判定する（ヘッダーがあれば単に読み飛ばす）。
 function parseCompanySettingsFromText(text) {
@@ -4820,6 +4980,26 @@ function doGet(e) {
       var lrSubject = 'DSBZ給与：有給申請';
       var lrBody = lrEmpName + 'さんから有給申請が届きました。' + lrDate + '。理由：' + lrReason + 'のため。内容を確認し、アプリより、有給許可を行ってください。\\n※本メールはDSBZ給与より自動送信されています。';
       MailApp.sendEmail(getLeaveTypeEmail(), lrSubject, lrBody);
+      out = {success: true};
+    } else if (action === 'sendCommutePassRequest') {
+      var cpEmpId = e.parameter.empId || '';
+      var cpEmpName = e.parameter.empName || '';
+      var cpRequestType = e.parameter.requestType || 'apply';
+      var cpMode = e.parameter.mode || '';
+      var cpModeLabel = cpMode === 'train' ? '電車' : (cpMode === 'car' ? '車' : (cpMode === 'bicycle' ? '自転車' : cpMode));
+      var cpSection = e.parameter.section || '';
+      var cpOneWay = e.parameter.oneWay || '';
+      var cpSubject, cpBody;
+      if (cpRequestType === 'cancel') {
+        cpSubject = 'DSBZ給与：定期代申請取消';
+        cpBody = cpEmpName + '（' + cpEmpId + '）さんが定期代の申請を取り消しました。\\n内容を確認し、給与計算への反映をご確認ください。\\n※本メールはDSBZ給与より自動送信されています。';
+      } else {
+        cpSubject = 'DSBZ給与：定期代申請';
+        cpBody = cpEmpName + '（' + cpEmpId + '）さんから定期代の申請/変更が届きました。\\n\\n通勤手段：' + cpModeLabel + '\\n'
+          + (cpMode === 'train' ? ('区間：' + cpSection + '\\n片道料金：' + cpOneWay + '円\\n往復料金：' + ((parseInt(cpOneWay, 10) || 0) * 2) + '円\\n') : '')
+          + '\\nアプリより内容を確認し、給与計算への反映をお願いします。\\n※本メールはDSBZ給与より自動送信されています。';
+      }
+      MailApp.sendEmail(getTransportEmail(), cpSubject, cpBody);
       out = {success: true};
     } else if (action === 'uploadChunkStart') {
       var upFolder = DriveApp.getFolderById(e.parameter.folder);
@@ -6089,6 +6269,8 @@ function fillSettingsForm(){
   document.getElementById('set-ot-warn-company').value = settings.otWarnHours!==undefined ? settings.otWarnHours : 45;
   document.getElementById('set-grant-date-company').value = settings.companyGrantDate || '';
   document.getElementById('set-grant-days-company').value = settings.companyGrantDays!==undefined ? settings.companyGrantDays : 20;
+  document.getElementById('set-car-daily-rate').value = settings.carDailyRate!==undefined ? settings.carDailyRate : 1000;
+  document.getElementById('set-bike-daily-rate').value = settings.bikeDailyRate!==undefined ? settings.bikeDailyRate : 100;
   document.getElementById('set-script-url').value = COMPANY_SCRIPT_URL;
   document.getElementById('set-drive-folder').value = settings.driveFolderId || '';
 }
@@ -6927,6 +7109,15 @@ function serializeSettingsText(){
   lines.push('');
   lines.push(`基本給:${settings.baseSalary||0}`);
   lines.push('');
+  if(settings.commute && settings.commute.mode){
+    const c = settings.commute;
+    if(c.mode === 'train'){
+      lines.push(`定期代:train:${c.section||''}|${c.oneWay||0}`);
+    }else{
+      lines.push(`定期代:${c.mode}`);
+    }
+  }
+  lines.push('');
   lines.push('残業時間履歴');
   Object.keys(otHoursByMonth).sort().forEach(ym=>{
     lines.push(`${ym.replace('-','')}:${otHoursByMonth[ym]}`);
@@ -7038,6 +7229,10 @@ function parseSettingsText(text){
       result.settings.bonusMonth2 = parseInt(m[1]);
     }else if(m = line.match(/^賞与日2:(\d+)/)){
       result.settings.bonusDay2 = parseInt(m[1]);
+    }else if(m = line.match(/^定期代:train:([^|]*)\|([\d.]+)$/)){
+      result.settings.commute = { mode: 'train', section: m[1], oneWay: parseFloat(m[2]) };
+    }else if(m = line.match(/^定期代:(car|bicycle)$/)){
+      result.settings.commute = { mode: m[1] };
     }else if(m = line.match(/^(\d{4})有給残:([\d.]+)$/)){
       result.byYear[m[1]] = parseFloat(m[2]);
     }

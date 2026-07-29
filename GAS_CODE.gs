@@ -274,7 +274,7 @@ function appendLine(doc, line) {
   doc.saveAndClose();
 }
 
-var COMPANY_SETTING_KEYS = ['有給次回付与', '付与数', '給料日', '締日', '賞与月1', '賞与日1', '賞与月2', '賞与日2', '残業時間警告基準'];
+var COMPANY_SETTING_KEYS = ['有給次回付与', '付与数', '給料日', '締日', '賞与月1', '賞与日1', '賞与月2', '賞与日2', '残業時間警告基準', '車通勤日額', '自転車通勤日額'];
 // 「会社共通設定」ヘッダーが無い旧形式のドキュメントでも設定値を読み取れるよう、
 // ヘッダーの有無に関わらずキー名で判定する（ヘッダーがあれば単に読み飛ばす）。
 function parseCompanySettingsFromText(text) {
@@ -747,6 +747,26 @@ function doGet(e) {
       var lrSubject = 'DSBZ給与：有給申請';
       var lrBody = lrEmpName + 'さんから有給申請が届きました。' + lrDate + '。理由：' + lrReason + 'のため。内容を確認し、アプリより、有給許可を行ってください。\n※本メールはDSBZ給与より自動送信されています。';
       MailApp.sendEmail(getLeaveTypeEmail(), lrSubject, lrBody);
+      out = {success: true};
+    } else if (action === 'sendCommutePassRequest') {
+      var cpEmpId = e.parameter.empId || '';
+      var cpEmpName = e.parameter.empName || '';
+      var cpRequestType = e.parameter.requestType || 'apply';
+      var cpMode = e.parameter.mode || '';
+      var cpModeLabel = cpMode === 'train' ? '電車' : (cpMode === 'car' ? '車' : (cpMode === 'bicycle' ? '自転車' : cpMode));
+      var cpSection = e.parameter.section || '';
+      var cpOneWay = e.parameter.oneWay || '';
+      var cpSubject, cpBody;
+      if (cpRequestType === 'cancel') {
+        cpSubject = 'DSBZ給与：定期代申請取消';
+        cpBody = cpEmpName + '（' + cpEmpId + '）さんが定期代の申請を取り消しました。\n内容を確認し、給与計算への反映をご確認ください。\n※本メールはDSBZ給与より自動送信されています。';
+      } else {
+        cpSubject = 'DSBZ給与：定期代申請';
+        cpBody = cpEmpName + '（' + cpEmpId + '）さんから定期代の申請/変更が届きました。\n\n通勤手段：' + cpModeLabel + '\n'
+          + (cpMode === 'train' ? ('区間：' + cpSection + '\n片道料金：' + cpOneWay + '円\n往復料金：' + ((parseInt(cpOneWay, 10) || 0) * 2) + '円\n') : '')
+          + '\nアプリより内容を確認し、給与計算への反映をお願いします。\n※本メールはDSBZ給与より自動送信されています。';
+      }
+      MailApp.sendEmail(getTransportEmail(), cpSubject, cpBody);
       out = {success: true};
     } else if (action === 'uploadChunkStart') {
       var upFolder = DriveApp.getFolderById(e.parameter.folder);
