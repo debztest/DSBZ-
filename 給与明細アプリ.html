@@ -740,11 +740,21 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <div class="section-title">残業代の見込み</div>
       <label class="field">対象月（月末締め）</label>
       <input type="month" id="ot-month">
-      <label class="field">対象月の残業時間（時間）</label>
+      <label class="field">通常残業時間（時間）</label>
       <input type="number" id="ot-hours" step="0.5" min="0" value="0">
+      <label class="field">深夜残業時間（22時〜5時分・時間）</label>
+      <input type="number" id="ot-hours-night" step="0.5" min="0" value="0">
       <div class="formula" id="ot-formula">基本給と所定労働時間を設定タブで入力してください。</div>
       <div class="row mt-14">
-        <span class="muted">残業代</span>
+        <span class="muted">通常残業代</span>
+        <span class="mono" id="ot-pay-normal">¥0</span>
+      </div>
+      <div class="row">
+        <span class="muted">深夜残業代</span>
+        <span class="mono" id="ot-pay-night">¥0</span>
+      </div>
+      <div class="row mt-8">
+        <span class="muted">残業代 合計</span>
         <span class="mono money-value-lg" id="ot-pay">¥0</span>
       </div>
       <div class="row">
@@ -975,6 +985,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <input type="number" id="set-standard-hours" placeholder="160">
       <label class="field">残業割増率</label>
       <input type="number" id="set-ot-rate" step="0.01" placeholder="1.25">
+      <label class="field">深夜残業割増率（22時〜5時分）</label>
+      <input type="number" id="set-ot-night-rate" step="0.01" placeholder="1.5">
     </div>
     <div class="card" id="card-pay-rules">
       <div class="row mb-2">
@@ -2468,6 +2480,7 @@ function applyCompanySettings(cs, paydayOverrides){
     if(cs['賞与月2']!==undefined) settings.bonusMonth2 = parseInt(cs['賞与月2']);
     if(cs['賞与日2']!==undefined) settings.bonusDay2 = parseInt(cs['賞与日2']);
     if(cs['残業割増率']!==undefined) settings.otRate = parseFloat(cs['残業割増率']);
+    if(cs['深夜残業割増率']!==undefined) settings.otNightRate = parseFloat(cs['深夜残業割増率']);
     if(cs['所定労働時間']!==undefined) settings.standardHours = parseFloat(cs['所定労働時間']);
     if(cs['残業時間警告基準']!==undefined) settings.otWarnHours = parseFloat(cs['残業時間警告基準']);
     if(cs['車通勤日額']!==undefined) settings.carDailyRate = parseFloat(cs['車通勤日額']);
@@ -6333,6 +6346,7 @@ function fillSettingsForm(){
   document.getElementById('set-base-salary').value = settings.baseSalary || '';
   document.getElementById('set-standard-hours').value = settings.standardHours || '';
   document.getElementById('set-ot-rate').value = settings.otRate || 1.25;
+  document.getElementById('set-ot-night-rate').value = settings.otNightRate || 1.5;
   document.getElementById('set-pay-day').value = settings.payDay!==undefined ? settings.payDay : 5;
   document.getElementById('set-close-day').value = settings.closeDay!==undefined ? settings.closeDay : 0;
   document.getElementById('set-bonus-month1').value = settings.bonusMonth1!==undefined ? settings.bonusMonth1 : 8;
@@ -6354,6 +6368,7 @@ function readSettingsForm(){
     baseSalary: parseFloat(document.getElementById('set-base-salary').value)||0,
     standardHours: parseFloat(document.getElementById('set-standard-hours').value)||0,
     otRate: parseFloat(document.getElementById('set-ot-rate').value)||1.25,
+    otNightRate: parseFloat(document.getElementById('set-ot-night-rate').value)||1.5,
     payDay: parseInt(document.getElementById('set-pay-day').value)||5,
     closeDay: document.getElementById('set-close-day').value===''?0:parseInt(document.getElementById('set-close-day').value),
     bonusMonth1: parseInt(document.getElementById('set-bonus-month1').value)||8,
@@ -7194,7 +7209,8 @@ function serializeSettingsText(){
   lines.push('');
   lines.push('残業時間履歴');
   Object.keys(otHoursByMonth).sort().forEach(ym=>{
-    lines.push(`${ym.replace('-','')}:${otHoursByMonth[ym]}`);
+    const entry = getOtEntry(ym);
+    lines.push(`${ym.replace('-','')}:${entry.normal}:${entry.night}`);
   });
   lines.push('');
   lines.push('給与実績履歴');
@@ -7256,10 +7272,16 @@ function parseSettingsText(text){
       section = null;
     }
     if(section === 'ot'){
+      m = line.match(/^(\d{6}):([\d.]+):([\d.]+)$/);
+      if(m){
+        const ym = `${m[1].slice(0,4)}-${m[1].slice(4,6)}`;
+        result.otHoursByMonth[ym] = { normal: parseFloat(m[2]), night: parseFloat(m[3]) };
+        return;
+      }
       m = line.match(/^(\d{6}):([\d.]+)$/);
       if(m){
         const ym = `${m[1].slice(0,4)}-${m[1].slice(4,6)}`;
-        result.otHoursByMonth[ym] = parseFloat(m[2]);
+        result.otHoursByMonth[ym] = { normal: parseFloat(m[2]), night: 0 };
         return;
       }
       section = null;
@@ -7295,6 +7317,8 @@ function parseSettingsText(text){
       result.settings.standardHours = parseFloat(m[1]);
     }else if(m = line.match(/^残業割増率:([\d.]+)$/)){
       result.settings.otRate = parseFloat(m[1]);
+    }else if(m = line.match(/^深夜残業割増率:([\d.]+)$/)){
+      result.settings.otNightRate = parseFloat(m[1]);
     }else if(m = line.match(/^賞与月1:(\d+)$/)){
       result.settings.bonusMonth1 = parseInt(m[1]);
     }else if(m = line.match(/^賞与日1:(\d+)/)){
@@ -7937,10 +7961,22 @@ function previousMonthStr(){
 }
 document.getElementById('ot-month').value = currentMonthStr();
 
+// 深夜残業時間を後から追加したため、otHoursByMonthには単純な数値（旧形式・通常残業時間のみ）と
+// {normal, night}のオブジェクト（新形式）が混在しうる。常にこの関数経由で読み出すことで両対応する。
+function getOtEntry(ym){
+  const v = otHoursByMonth[ym];
+  if(v === undefined) return undefined;
+  if(typeof v === 'number') return { normal: v, night: 0 };
+  return { normal: v.normal||0, night: v.night||0 };
+}
+function otEntryTotal(entry){
+  return (entry.normal||0) + (entry.night||0);
+}
 function loadOvertimeHoursField(){
   const monthStr = document.getElementById('ot-month').value || currentMonthStr();
-  const hours = otHoursByMonth[monthStr] !== undefined ? otHoursByMonth[monthStr] : 0;
-  document.getElementById('ot-hours').value = hours;
+  const entry = getOtEntry(monthStr) || { normal: 0, night: 0 };
+  document.getElementById('ot-hours').value = entry.normal;
+  document.getElementById('ot-hours-night').value = entry.night;
 }
 loadOvertimeHoursField();
 function renderOvertime(){
@@ -7948,23 +7984,31 @@ function renderOvertime(){
   const monthStr = document.getElementById('ot-month').value || currentMonthStr();
   const [y, mo] = monthStr.split('-').map(Number);
   const hours = parseFloat(document.getElementById('ot-hours').value) || 0;
+  const nightHours = parseFloat(document.getElementById('ot-hours-night').value) || 0;
 
   const base = settings.baseSalary || 0;
   const std = settings.standardHours || 0;
   const rate = settings.otRate || 1.25;
+  const nightRate = settings.otNightRate || 1.5;
 
   if(!base || !std){
     document.getElementById('ot-formula').textContent = '基本給と所定労働時間を設定タブで入力してください。';
+    document.getElementById('ot-pay-normal').textContent = '¥0';
+    document.getElementById('ot-pay-night').textContent = '¥0';
     document.getElementById('ot-pay').textContent = '¥0';
     document.getElementById('ot-total').textContent = '¥0';
   }else{
     const hourly = base/std;
-    const otPay = Math.round(hourly * rate * hours);
+    const otPayNormal = Math.round(hourly * rate * hours);
+    const otPayNight = Math.round(hourly * nightRate * nightHours);
+    const otPay = otPayNormal + otPayNight;
     const total = base + otPay;
     document.getElementById('ot-formula').textContent =
-      `時給換算 = ${base.toLocaleString()}円 ÷ ${std}時間 = ${Math.round(hourly).toLocaleString()}円/時\n残業代 = ${Math.round(hourly).toLocaleString()}円 × ${rate} × ${hours}時間`;
-    document.getElementById('ot-pay').textContent = `¥${otPay.toLocaleString()}`;
-    document.getElementById('ot-total').textContent = `¥${total.toLocaleString()}`;
+      `時給換算 = ${base.toLocaleString()}円 ÷ ${std}時間 = ${Math.round(hourly).toLocaleString()}円/時\n通常残業代 = ${Math.round(hourly).toLocaleString()}円 × ${rate} × ${hours}時間\n深夜残業代 = ${Math.round(hourly).toLocaleString()}円 × ${nightRate} × ${nightHours}時間`;
+    document.getElementById('ot-pay-normal').textContent = formatYen(otPayNormal);
+    document.getElementById('ot-pay-night').textContent = formatYen(otPayNight);
+    document.getElementById('ot-pay').textContent = formatYen(otPay);
+    document.getElementById('ot-total').textContent = formatYen(total);
   }
   const pd = paydayForMonth(y, mo+1);
   document.getElementById('ot-payday-label').textContent = `${y}年${mo}月度（月末締め） → 支給予定日 ${fmtDate(pd)}`;
@@ -7974,9 +8018,13 @@ document.getElementById('ot-month').addEventListener('change', ()=>{
   renderOvertime();
 });
 document.getElementById('ot-hours').addEventListener('input', renderOvertime);
+document.getElementById('ot-hours-night').addEventListener('input', renderOvertime);
 document.getElementById('ot-save').addEventListener('click', async (ev)=>{
   const monthStr = document.getElementById('ot-month').value || currentMonthStr();
-  otHoursByMonth[monthStr] = parseFloat(document.getElementById('ot-hours').value)||0;
+  otHoursByMonth[monthStr] = {
+    normal: parseFloat(document.getElementById('ot-hours').value)||0,
+    night: parseFloat(document.getElementById('ot-hours-night').value)||0
+  };
   saveJSON('otHoursByMonth', otHoursByMonth);
   renderOvertime();
   renderSummary();
@@ -8042,9 +8090,9 @@ function renderSalaryChart(){
     const k = `${y}-${String(m).padStart(2,'0')}`;
     const matchingKeys = Object.keys(payHistory).filter(pk => pk === k || pk.startsWith(k+'#')).sort();
     let salaries = matchingKeys.filter(pk => payHistory[pk].salary).map(pk => Object.assign({isEstimate:false, payKey:pk}, payHistory[pk].salary));
-    if(salaries.length===0 && otHoursByMonth[k] !== undefined){
-      const hours = otHoursByMonth[k]||0;
-      const otPay = (settingsBase && std) ? Math.round((settingsBase/std)*rate*hours) : 0;
+    const otEntry = getOtEntry(k);
+    if(salaries.length===0 && otEntry !== undefined){
+      const otPay = (settingsBase && std) ? Math.round((settingsBase/std)*rate*otEntry.normal) + Math.round((settingsBase/std)*(settings.otNightRate||1.5)*otEntry.night) : 0;
       salaries = [{ base:settingsBase, otPay, total:settingsBase+otPay, isEstimate:true, payKey:null }];
     }
     const bonuses = matchingKeys.filter(pk => payHistory[pk].bonus).map(pk => Object.assign({payKey:pk}, payHistory[pk].bonus));
@@ -8251,8 +8299,10 @@ function renderSummary(){
   document.getElementById('sum-grant').textContent = grantDateEff ? `${isoToDisplay(grantDateEff)}（${effectiveGrantDays()||0}日）` : '未設定';
   const cm = currentMonthStr();
   const pm = previousMonthStr();
-  const curHrs = otHoursByMonth[cm];
-  const prevHrs = otHoursByMonth[pm];
+  const curEntry = getOtEntry(cm);
+  const prevEntry = getOtEntry(pm);
+  const curHrs = curEntry !== undefined ? otEntryTotal(curEntry) : undefined;
+  const prevHrs = prevEntry !== undefined ? otEntryTotal(prevEntry) : undefined;
   const otEl = document.getElementById('sum-ot');
   const otPrevEl = document.getElementById('sum-ot-prev');
   otEl.textContent = (curHrs===undefined) ? '未入力' : `${curHrs}時間`;
