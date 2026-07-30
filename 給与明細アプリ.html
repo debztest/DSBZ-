@@ -7956,6 +7956,9 @@ function currentMonthStr(){
 }
 function previousMonthStr(){
   const d = new Date();
+  // 日を1日に固定してから月を戻す。今日が31日等で前月に同じ日が無い場合、
+  // setMonthが翌月へ繰り上がってしまい前月と同じ月を返してしまうバグを防ぐため。
+  d.setDate(1);
   d.setMonth(d.getMonth()-1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 }
