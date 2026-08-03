@@ -7187,7 +7187,8 @@ function jsonpRequest(url){
     const cbName = 'jsonp_cb_' + (jsonpCounter++) + '_' + Date.now();
     const script = document.createElement('script');
     const cleanup = ()=>{ try{ delete window[cbName]; }catch(e){} script.remove(); };
-    const timer = setTimeout(()=>{ cleanup(); reject(new Error('タイムアウトしました（Apps ScriptのURLが正しいか確認してください）')); }, 25000);
+    // GAS（特にコールドスタート直後）は応答に時間がかかることがあるため、余裕を持って45秒で待つ
+    const timer = setTimeout(()=>{ cleanup(); reject(new Error('タイムアウトしました（Googleサーバーが混み合っている可能性があります。時間をおいて再度お試しください）')); }, 45000);
     window[cbName] = (data)=>{ clearTimeout(timer); cleanup(); resolve(data); };
     script.onerror = ()=>{ clearTimeout(timer); cleanup(); reject(new Error('スクリプトの読み込みに失敗しました（URLを確認してください）')); };
     script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
