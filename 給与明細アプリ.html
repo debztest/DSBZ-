@@ -924,6 +924,32 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       </div>
       <div id="news-log-list"><div class="empty">お知らせはまだありません。</div></div>
     </div>
+    <div class="card" id="card-drive-sync" style="display:none;">
+      <div class="section-title">Google Drive連携</div>
+      <label class="field mt-0">現在のフォルダID（ログインすると自動設定されます）</label>
+      <input type="text" id="set-drive-folder" placeholder="1kHB__0s1hetSuXEQWVqtyllw7P6BVRdJ">
+      <div class="helptext">基本給・給料日・有給日数などの設定は「給与明細設定値」というGoogleドキュメントに自動で保存・同期されます。「設定を保存」を押すたび、また有給を記録するたびに自動で同期されます。</div>
+      <p class="muted mt-6" id="sync-status"></p>
+    </div>
+    <div class="card is-hidden">
+      <textarea id="gas-code" readonly></textarea>
+      <button class="btn ghost small" id="btn-copy-gas">コードをコピー</button>
+      <input type="text" id="set-script-url" readonly>
+    </div>
+    <div class="card">
+      <div class="section-title">給与の基礎情報</div>
+      <label class="field">基本給（月額・円）</label>
+      <input type="number" id="set-base-salary" placeholder="300000">
+      <label class="field">所定労働時間（月・時間）</label>
+      <input type="number" id="set-standard-hours" placeholder="160">
+      <label class="field">残業割増率</label>
+      <input type="number" id="set-ot-rate" step="0.01" placeholder="1.25">
+      <label class="field">深夜残業割増率（22時〜5時分）</label>
+      <input type="number" id="set-ot-night-rate" step="0.01" placeholder="1.5">
+    </div>
+    <button class="btn" id="btn-save-settings">設定を保存</button>
+    <div class="divider-16" id="settings-admin-divider" style="display:none;"></div>
+    <p class="muted fs-11" id="settings-admin-label" style="display:none;text-align:center;">ここから下は管理者のみに表示される設定です</p>
     <div class="card admin-closed-hint" id="card-admin-system" style="display:none;">
       <div class="row mb-2">
         <div class="section-title mb-0">システム設定（管理者用）</div>
@@ -965,29 +991,6 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <p class="muted mt-6" id="admin-retention-status"></p>
       <div class="helptext">初期値は1826日（5年）です。法令に基づいた正しい期間は、社労士等にご確認の上、必要であれば変更してください。ユーザー削除後、この日数が経過すると自動的に完全削除されます。</div>
       </div>
-    </div>
-    <div class="card" id="card-drive-sync" style="display:none;">
-      <div class="section-title">Google Drive連携</div>
-      <label class="field mt-0">現在のフォルダID（ログインすると自動設定されます）</label>
-      <input type="text" id="set-drive-folder" placeholder="1kHB__0s1hetSuXEQWVqtyllw7P6BVRdJ">
-      <div class="helptext">基本給・給料日・有給日数などの設定は「給与明細設定値」というGoogleドキュメントに自動で保存・同期されます。「設定を保存」を押すたび、また有給を記録するたびに自動で同期されます。</div>
-      <p class="muted mt-6" id="sync-status"></p>
-    </div>
-    <div class="card is-hidden">
-      <textarea id="gas-code" readonly></textarea>
-      <button class="btn ghost small" id="btn-copy-gas">コードをコピー</button>
-      <input type="text" id="set-script-url" readonly>
-    </div>
-    <div class="card">
-      <div class="section-title">給与の基礎情報</div>
-      <label class="field">基本給（月額・円）</label>
-      <input type="number" id="set-base-salary" placeholder="300000">
-      <label class="field">所定労働時間（月・時間）</label>
-      <input type="number" id="set-standard-hours" placeholder="160">
-      <label class="field">残業割増率</label>
-      <input type="number" id="set-ot-rate" step="0.01" placeholder="1.25">
-      <label class="field">深夜残業割増率（22時〜5時分）</label>
-      <input type="number" id="set-ot-night-rate" step="0.01" placeholder="1.5">
     </div>
     <div class="card admin-closed-hint" id="card-pay-rules">
       <div class="row mb-2">
@@ -1033,7 +1036,6 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <p class="muted mt-6" id="payday-override-status"></p>
       </div>
     </div>
-    <button class="btn" id="btn-save-settings">設定を保存</button>
   </section>
 
   <section class="view" id="view-maintenance">
@@ -2383,6 +2385,8 @@ function applyAdminVisibilitySafe(){
   const usersCard = document.getElementById('card-admin-users');
   const specialPeriodsCard = document.getElementById('card-admin-special-periods');
   const maintTab = document.getElementById('tab-maintenance');
+  const settingsAdminDivider = document.getElementById('settings-admin-divider');
+  const settingsAdminLabel = document.getElementById('settings-admin-label');
   if(driveCard) driveCard.style.display = 'none';
   if(payCard) payCard.style.display = 'none';
   if(newsCard) newsCard.style.display = 'none';
@@ -2391,6 +2395,8 @@ function applyAdminVisibilitySafe(){
   if(usersCard) usersCard.style.display = 'none';
   if(specialPeriodsCard) specialPeriodsCard.style.display = 'none';
   if(maintTab) maintTab.style.display = 'none';
+  if(settingsAdminDivider) settingsAdminDivider.style.display = 'none';
+  if(settingsAdminLabel) settingsAdminLabel.style.display = 'none';
 }
 
 function resetPersonalDataForLogin(){
@@ -2427,6 +2433,8 @@ function applyAdminVisibility(isAdmin){
   const usersCard = document.getElementById('card-admin-users');
   const specialPeriodsCard = document.getElementById('card-admin-special-periods');
   const maintTab = document.getElementById('tab-maintenance');
+  const settingsAdminDivider = document.getElementById('settings-admin-divider');
+  const settingsAdminLabel = document.getElementById('settings-admin-label');
   if(payCard) payCard.style.display = isAdmin ? 'block' : 'none';
   if(newsCard) newsCard.style.display = isAdmin ? 'block' : 'none';
   if(logsCard) logsCard.style.display = isAdmin ? 'block' : 'none';
@@ -2434,6 +2442,8 @@ function applyAdminVisibility(isAdmin){
   if(usersCard) usersCard.style.display = isAdmin ? 'block' : 'none';
   if(specialPeriodsCard) specialPeriodsCard.style.display = isAdmin ? 'block' : 'none';
   if(maintTab) maintTab.style.display = isAdmin ? 'flex' : 'none';
+  if(settingsAdminDivider) settingsAdminDivider.style.display = isAdmin ? 'block' : 'none';
+  if(settingsAdminLabel) settingsAdminLabel.style.display = isAdmin ? 'block' : 'none';
   if(isAdmin){ loadInquiryContactForAdmin(); loadTransportContactForAdmin(); loadLeaveTypeContactForAdmin(); loadRetentionDaysForAdmin(); refreshTransportRequestsAdmin(); renderAdminSpecialPeriodLists(); }
 }
 
