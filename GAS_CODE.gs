@@ -37,6 +37,26 @@ function logSystemEvent(eventType, detail) {
   var logLine = new Date().toISOString() + ':system:system:' + eventType + ':' + detail.replace(/\n/g, ' ');
   appendLine(logDoc, logLine);
 }
+// 「操作ログ」を圧縮する。現在の操作ログの内容を日付入りのアーカイブドキュメントへ書き出し、
+// 本体の操作ログは空にリセットする（肥大化を防ぐ）。Apps Scriptのトリガー（時間主導型・
+// 週タイマー）でこの関数を呼び出すよう設定すると、週次で自動圧縮されます。
+function compressSystemLogs() {
+  var logDoc = getOrCreateMasterDoc('操作ログ');
+  var logBody = logDoc.getBody();
+  var lines = logBody.getText().split('\n').filter(function (l) { return l.trim(); });
+  if (lines.length === 0) return 0;
+  var archiveName = '操作ログ_アーカイブ_' + todayDateString();
+  var archiveDoc = getOrCreateMasterDoc(archiveName);
+  var archiveBody = archiveDoc.getBody();
+  var existingText = archiveBody.getText();
+  var newText = (existingText ? existingText + '\n' : '') + lines.join('\n');
+  archiveBody.editAsText().setText(newText);
+  archiveDoc.saveAndClose();
+  logBody.editAsText().setText('');
+  logDoc.saveAndClose();
+  logSystemEvent('log_compressed', lines.length + '件の操作ログを「' + archiveName + '」へ圧縮しました');
+  return lines.length;
+}
 var BOOTSTRAP_DOC_ID = '15GaNuDtOCUW311AS-dKXSbu7x2-mVGHblkIe25KlY4I'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
 var APP_VERSION_GAS = '2026.07.13.1'; // このGASコードの版数。デプロイのたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
 
@@ -1071,6 +1091,9 @@ function doGet(e) {
       var logLines = logDocG.getBody().getText().split('\n').filter(function(l){ return l.trim(); });
       var recent = logLines.slice(Math.max(0, logLines.length - 200));
       out = { success: true, logs: recent };
+    } else if (action === 'compressLogsNow') {
+      var compressedCountL = compressSystemLogs();
+      out = { success: true, count: compressedCountL };
     } else if (action === 'adminFindUsersByQuery') {
       var ssQ = openMasterSpreadsheet();
       if (!ssQ) {

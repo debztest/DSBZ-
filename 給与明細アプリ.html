@@ -1072,6 +1072,10 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <button class="btn ghost small w-full" id="btn-load-logs">最新のログを読み込む</button>
       <button class="btn ghost small w-full is-hidden" id="btn-close-logs">閉じる</button>
       <pre id="log-list" style="white-space:pre-wrap;font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;max-height:260px;overflow:auto;"></pre>
+      <div class="divider-16"></div>
+      <button class="btn ghost small w-full" id="btn-compress-logs">ログを今すぐ圧縮する</button>
+      <p class="muted mt-6" id="compress-logs-status"></p>
+      <div class="helptext">操作ログが増え続けるとデータが肥大化するため、内容を日付入りのアーカイブドキュメントへ書き出し、本体のログを空にします（削除ではなく退避です）。自動で毎週圧縮するには、Apps Scriptの編集画面で「トリガー」から compressSystemLogs 関数を時間主導型（週タイマー）で追加してください。</div>
     </div>
     <div class="card">
       <div class="row mb-2">
@@ -3008,6 +3012,26 @@ document.getElementById('btn-copy-logs').addEventListener('click', async ()=>{
   btn.classList.add('is-copied');
   setTimeout(()=>btn.classList.remove('is-copied'), 1200);
 });
+document.getElementById('btn-compress-logs').addEventListener('click', async ()=>{
+  const status = document.getElementById('compress-logs-status');
+  if(!(await showConfirmModal('現在の操作ログを日付入りのアーカイブドキュメントへ書き出し、本体の操作ログを空にします。（削除ではなく退避のため、内容はドライブに残ります）圧縮しますか？'))) return;
+  const btn = document.getElementById('btn-compress-logs');
+  setButtonLoading(btn, '圧縮しています…');
+  status.textContent = '';
+  try{
+    const data = await jsonpRequest(`${COMPANY_SCRIPT_URL}?action=compressLogsNow`);
+    if(data.error){ status.textContent = data.error; return; }
+    status.textContent = data.count > 0 ? `${data.count}件のログを圧縮しました。` : '圧縮対象のログはありませんでした。';
+    document.getElementById('log-list').textContent = '';
+    document.getElementById('btn-close-logs').classList.add('is-hidden');
+    document.getElementById('btn-load-logs').classList.remove('is-hidden');
+    logEvent('admin_change', `操作ログを圧縮（${data.count}件）`);
+  }catch(e){
+    status.textContent = '圧縮に失敗しました：' + e.message;
+  }finally{
+    clearButtonLoading(btn);
+  }
+});
 
 let adminFoundUserId = null;
 let adminFoundByYear = {};
@@ -4363,6 +4387,26 @@ function logSystemEvent(eventType, detail) {
   var logLine = new Date().toISOString() + ':system:system:' + eventType + ':' + detail.replace(/\\n/g, ' ');
   appendLine(logDoc, logLine);
 }
+// 「操作ログ」を圧縮する。現在の操作ログの内容を日付入りのアーカイブドキュメントへ書き出し、
+// 本体の操作ログは空にリセットする（肥大化を防ぐ）。Apps Scriptのトリガー（時間主導型・
+// 週タイマー）でこの関数を呼び出すよう設定すると、週次で自動圧縮されます。
+function compressSystemLogs() {
+  var logDoc = getOrCreateMasterDoc('操作ログ');
+  var logBody = logDoc.getBody();
+  var lines = logBody.getText().split('\\n').filter(function (l) { return l.trim(); });
+  if (lines.length === 0) return 0;
+  var archiveName = '操作ログ_アーカイブ_' + todayDateString();
+  var archiveDoc = getOrCreateMasterDoc(archiveName);
+  var archiveBody = archiveDoc.getBody();
+  var existingText = archiveBody.getText();
+  var newText = (existingText ? existingText + '\\n' : '') + lines.join('\\n');
+  archiveBody.editAsText().setText(newText);
+  archiveDoc.saveAndClose();
+  logBody.editAsText().setText('');
+  logDoc.saveAndClose();
+  logSystemEvent('log_compressed', lines.length + '件の操作ログを「' + archiveName + '」へ圧縮しました');
+  return lines.length;
+}
 var BOOTSTRAP_DOC_ID = '15GaNuDtOCUW311AS-dKXSbu7x2-mVGHblkIe25KlY4I'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
 var APP_VERSION_GAS = '2026.07.13.1'; // このGASコードの版数。デプロイのたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
 
@@ -5397,6 +5441,9 @@ function doGet(e) {
       var logLines = logDocG.getBody().getText().split('\\n').filter(function(l){ return l.trim(); });
       var recent = logLines.slice(Math.max(0, logLines.length - 200));
       out = { success: true, logs: recent };
+    } else if (action === 'compressLogsNow') {
+      var compressedCountL = compressSystemLogs();
+      out = { success: true, count: compressedCountL };
     } else if (action === 'adminFindUsersByQuery') {
       var ssQ = openMasterSpreadsheet();
       if (!ssQ) {
