@@ -48,6 +48,7 @@ main{flex:1;padding:16px 16px 96px;overflow-y:auto;}
 .view.active{display:block;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;transition:background .15s ease,border-color .15s ease;}
 .card.searching{background:#E3F4FB;border-color:#9BD8EF;}
+.card.admin-closed-hint{background:#E5F6EA;border-color:#A9DDB9;}
 .card:not(.no-focus-highlight):focus-within{background:#E3F4FB;border-color:#9BD8EF;}
 .section-title{font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;}
 .muted{color:var(--text-2);font-size:12px;}
@@ -923,7 +924,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       </div>
       <div id="news-log-list"><div class="empty">お知らせはまだありません。</div></div>
     </div>
-    <div class="card" id="card-admin-system" style="display:none;">
+    <div class="card admin-closed-hint" id="card-admin-system" style="display:none;">
       <div class="row mb-2">
         <div class="section-title mb-0">システム設定（管理者用）</div>
         <button class="btn ghost small collapsible-toggle">開く</button>
@@ -988,7 +989,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <label class="field">深夜残業割増率（22時〜5時分）</label>
       <input type="number" id="set-ot-night-rate" step="0.01" placeholder="1.5">
     </div>
-    <div class="card" id="card-pay-rules">
+    <div class="card admin-closed-hint" id="card-pay-rules">
       <div class="row mb-2">
         <div class="section-title mb-0">支払い・有給ルール（全社共通・管理者が変更可）</div>
         <button class="btn ghost small collapsible-toggle">開く</button>
@@ -3193,6 +3194,9 @@ document.getElementById('btn-new-user-toggle').addEventListener('click', ()=>{
   toggleBtn.addEventListener('click', ()=>{
     const nowHidden = body.classList.toggle('is-hidden');
     toggleBtn.textContent = nowHidden ? '開く' : '閉じる';
+    if(cardId === 'card-admin-system' || cardId === 'card-pay-rules'){
+      card.classList.toggle('admin-closed-hint', nowHidden);
+    }
     if(cardId === 'card-admin-leave-types' && !nowHidden){
       loadLeaveTypeDocOptions().then(()=>resetLeaveTypeDocRows());
     }
