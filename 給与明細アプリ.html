@@ -7594,8 +7594,16 @@ function fillManualEntryForm(prefix, ym, doc, payKey){
   el('bonus-fields').style.display = isBonus ? 'block' : 'none';
   el('base').value = rec && rec.salary ? rec.salary.base.toLocaleString('en-US') : '';
   el('otpay').value = rec && rec.salary ? rec.salary.otPay.toLocaleString('en-US') : '';
-  el('total').value = rec && rec.salary ? rec.salary.total.toLocaleString('en-US') : (rec && rec.bonus ? rec.bonus.total.toLocaleString('en-US') : '');
-  el('net').value = rec && rec.salary ? (rec.salary.net!==undefined?rec.salary.net:rec.salary.total).toLocaleString('en-US') : (rec && rec.bonus ? (rec.bonus.net!==undefined?rec.bonus.net:rec.bonus.total).toLocaleString('en-US') : '');
+  // 総支給額・差引支給額は給与・賞与で共用の欄のため、salaryの有無だけで決めず
+  // 今回開いている明細の種別（isBonus）に対応する実績を優先して表示する。
+  // そうしないと、同月の給与を登録した直後に賞与の明細を開いたとき、
+  // 給与側の総支給額・差引支給額が誤って表示されてしまう。
+  el('total').value = isBonus
+    ? (rec && rec.bonus ? rec.bonus.total.toLocaleString('en-US') : '')
+    : (rec && rec.salary ? rec.salary.total.toLocaleString('en-US') : '');
+  el('net').value = isBonus
+    ? (rec && rec.bonus ? (rec.bonus.net!==undefined?rec.bonus.net:rec.bonus.total).toLocaleString('en-US') : '')
+    : (rec && rec.salary ? (rec.salary.net!==undefined?rec.salary.net:rec.salary.total).toLocaleString('en-US') : '');
   el('bonus').value = rec && rec.bonus ? rec.bonus.total.toLocaleString('en-US') : '';
   el('status').textContent = payKey && payKey !== ym ? 'この明細専用の実績です（同月の他の明細とは別に保存されます）' : '';
 }
