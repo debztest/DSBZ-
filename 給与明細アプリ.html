@@ -7809,6 +7809,7 @@ async function applyLeave(){
   const noteInput = document.getElementById('yukyu-input-note').value.trim();
   const note = noteInput || '私用のため';
   const dateStr = dateInput;
+  if(!(await showConfirmModal(`${isoToDisplay(dateStr)}を有給として使用申請しますか？\n理由：${note}`))) return;
   const consumedFrom = deductLeave(days);
   const isPendingUse = !currentIsAdmin;
   const requestId = isPendingUse ? genRequestId() : null;
