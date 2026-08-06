@@ -786,7 +786,8 @@ function doGet(e) {
         cpLegs.forEach(function (leg, idx) {
           var legOneWay = parseInt(leg.oneWay, 10) || 0;
           cpOneWayTotal += legOneWay;
-          cpLegsText += (idx + 1) + '. ' + (leg.section || '') + '：片道' + legOneWay + '円\n';
+          var legLabel = (leg.from !== undefined) ? ((leg.from || '') + '〜' + (leg.to || '')) : (leg.section || '');
+          cpLegsText += (idx + 1) + '. ' + legLabel + '：片道' + legOneWay + '円\n';
         });
         cpSubject = 'DSBZ給与：定期代申請';
         cpBody = cpEmpName + '（' + cpEmpId + '）さんから定期代の申請/変更が届きました。\n\n通勤手段：' + cpModeLabel + '\n'
