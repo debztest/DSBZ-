@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kyuyodaicho-v2';
+const CACHE_NAME = 'kyuyodaicho-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -24,7 +24,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   event.respondWith(
-    fetch(event.request)
+    // ブラウザのHTTPキャッシュを経由して古い内容が返らないよう、
+    // 常にネットワークへ再検証（reload）させてから取得する。
+    fetch(event.request, { cache: 'reload' })
       .then((res) => {
         const resClone = res.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
