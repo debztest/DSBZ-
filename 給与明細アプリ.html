@@ -289,10 +289,13 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 
 /* --- PC版レイアウト：明細タブのサマリーを左、明細リストを右の2カラムに --- */
 /* --- 有給タブも同様に、有給残日数を左、履歴を右の2カラムに --- */
+/* --- 給与タブは、次回給料日・累計支給額・残業代見込みを左、給与推移・実績手入力を右の2カラムに --- */
 @media (min-width: 680px){
   #app, nav.tabbar{max-width:960px;}
   #view-meisai.active, #view-yukyu.active{display:grid;grid-template-columns:minmax(260px,360px) 1fr;align-items:start;gap:16px;}
   #view-meisai > .card, #view-yukyu > .card{margin-bottom:0;}
+  #view-kyuyo.active{display:grid;grid-template-columns:minmax(260px,360px) 1fr;align-items:start;gap:16px;}
+  .two-col-left, .two-col-right{min-width:0;}
 }
 </style>
 </head>
@@ -729,6 +732,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 
   <!-- 給与タブ -->
   <section class="view" id="view-kyuyo">
+    <div class="two-col-left">
     <div class="card">
       <div class="section-title">次回給料日</div>
       <span class="big-num mono" id="payday-next">-</span>
@@ -773,6 +777,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <p class="muted mt-8" id="ot-payday-label"></p>
       <button class="btn mt-12" id="ot-save">この月の残業時間を保存</button>
     </div>
+    </div>
+    <div class="two-col-right">
     <div class="card">
       <div class="section-title">給与推移（基本給＋残業代）</div>
       <div class="row center-row-gap-10">
@@ -814,6 +820,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <input type="text" inputmode="numeric" class="man-amount" id="man-net">
       <button class="btn mt-12" id="man-save">この内容をグラフに反映</button>
       <p class="muted mt-8" id="man-status"></p>
+    </div>
     </div>
   </section>
 
