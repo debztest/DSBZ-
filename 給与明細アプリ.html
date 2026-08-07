@@ -720,12 +720,13 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
           <input type="month" id="meisai-filter-to" style="flex:1;">
         </div>
         <div class="row-wrap-6 mt-8">
-          <button class="filter-chip active" data-meisai-cat="salary">明細</button>
-          <button class="filter-chip active" data-meisai-cat="bonus">賞与</button>
-          <button class="filter-chip active" data-meisai-cat="other">その他</button>
-          <button class="filter-chip active" data-meisai-cat="unregistered">未登録</button>
-          <button class="filter-chip active" data-meisai-cat="missing">紛失</button>
+          <button class="filter-chip" data-meisai-cat="salary">明細</button>
+          <button class="filter-chip" data-meisai-cat="bonus">賞与</button>
+          <button class="filter-chip" data-meisai-cat="other">その他</button>
+          <button class="filter-chip" data-meisai-cat="unregistered">未登録</button>
+          <button class="filter-chip" data-meisai-cat="missing">紛失</button>
         </div>
+        <p class="muted fs-11 mt-6">何も選択しない場合はすべての種類を対象にします。</p>
         <div class="row-wrap-6 mt-10">
           <button class="btn ghost small" id="btn-meisai-filter-reset">条件をクリア</button>
           <button class="btn small" id="btn-meisai-filter-apply">絞り込む</button>
@@ -7254,11 +7255,13 @@ function renderMonthDocsSplit(container, docsForMonth, ym, driveLabel, localLabe
   if(localGroup.length > 0) renderMonthDocs(container, localGroup, ym, localLabel, true);
 }
 
-let meisaiFilterCategories = new Set(['salary','bonus','other','unregistered','missing']);
+// チップは何も押していない状態＝グレー＝制限なし（すべて対象）。
+// 押したチップ（紫）がある場合だけ、そのカテゴリに絞り込む（複数選択はOR条件）。
+let meisaiFilterCategories = new Set();
 function meisaiFilterIsActive(){
   const from = document.getElementById('meisai-filter-from').value;
   const to = document.getElementById('meisai-filter-to').value;
-  return !!(from || to || meisaiFilterCategories.size < 5);
+  return !!(from || to || meisaiFilterCategories.size > 0);
 }
 function renderMeisaiLists(){
   if(meisaiFilterIsActive()) renderMeisaiFilteredList();
@@ -7347,17 +7350,18 @@ function renderMeisaiFilteredList(){
   });
 
   const cats = meisaiFilterCategories;
+  const noCatRestriction = cats.size === 0;
   let visibleCount = 0;
   listEl.querySelectorAll('.ledger-row').forEach(row=>{
     const isMissing = row.dataset.catMissing === '1';
-    const matches = isMissing
+    const matches = noCatRestriction || (isMissing
       ? cats.has('missing')
       : (
         (cats.has('salary') && row.dataset.catType === 'salary') ||
         (cats.has('bonus') && row.dataset.catType === 'bonus') ||
         (cats.has('other') && row.dataset.catLocal === '1') ||
         (cats.has('unregistered') && row.dataset.catRegistered === '0')
-      );
+      ));
     row.style.display = matches ? '' : 'none';
     if(matches) visibleCount++;
   });
@@ -7389,8 +7393,8 @@ document.getElementById('btn-meisai-filter-apply').addEventListener('click', ren
 document.getElementById('btn-meisai-filter-reset').addEventListener('click', ()=>{
   document.getElementById('meisai-filter-from').value = '';
   document.getElementById('meisai-filter-to').value = '';
-  meisaiFilterCategories = new Set(['salary','bonus','other','unregistered','missing']);
-  document.querySelectorAll('[data-meisai-cat]').forEach(btn=>btn.classList.add('active'));
+  meisaiFilterCategories = new Set();
+  document.querySelectorAll('[data-meisai-cat]').forEach(btn=>btn.classList.remove('active'));
   renderMeisaiLists();
 });
 document.getElementById('btn-show-all').addEventListener('click', ()=>{
