@@ -290,11 +290,12 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 /* --- PC版レイアウト：明細タブのサマリーを左、明細リストを右の2カラムに --- */
 /* --- 有給タブも同様に、有給残日数を左、履歴を右の2カラムに --- */
 /* --- 給与タブは、次回給料日・累計支給額・残業代見込みを左、給与推移・実績手入力を右の2カラムに --- */
+/* --- 交通費タブは、交通費を申請・定期代の申請を左、申請状況・履歴（管理者用サマリー含む）を右の2カラムに --- */
 @media (min-width: 680px){
   #app, nav.tabbar{max-width:960px;}
   #view-meisai.active, #view-yukyu.active{display:grid;grid-template-columns:minmax(260px,360px) 1fr;align-items:start;gap:16px;}
   #view-meisai > .card, #view-yukyu > .card{margin-bottom:0;}
-  #view-kyuyo.active{display:grid;grid-template-columns:minmax(260px,360px) 1fr;align-items:start;gap:16px;}
+  #view-kyuyo.active, #view-transport.active{display:grid;grid-template-columns:minmax(260px,360px) 1fr;align-items:start;gap:16px;}
   .two-col-left, .two-col-right{min-width:0;}
 }
 </style>
@@ -826,15 +827,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 
   <!-- 交通費タブ -->
   <section class="view" id="view-transport">
-    <div class="card is-hidden" id="card-transport-admin-summary">
-      <div class="row mb-2">
-        <span class="section-title mb-0" id="transport-admin-count-text">0件申請あり</span>
-        <button class="btn ghost small collapsible-toggle">開く</button>
-      </div>
-      <div class="collapsible-body is-hidden">
-        <div id="transport-admin-requests" class="mt-8"></div>
-      </div>
-    </div>
+    <div class="two-col-left">
     <div class="card">
       <div class="section-title">交通費を申請</div>
       <p class="muted">日付・区間・金額を入力して申請してください。</p>
@@ -895,9 +888,21 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <p class="muted mt-8" id="commute-status"></p>
       </div>
     </div>
+    </div>
+    <div class="two-col-right">
+    <div class="card is-hidden" id="card-transport-admin-summary">
+      <div class="row mb-2">
+        <span class="section-title mb-0" id="transport-admin-count-text">0件申請あり</span>
+        <button class="btn ghost small collapsible-toggle">開く</button>
+      </div>
+      <div class="collapsible-body is-hidden">
+        <div id="transport-admin-requests" class="mt-8"></div>
+      </div>
+    </div>
     <div class="card">
       <div class="section-title">申請状況・履歴</div>
       <div id="transport-my-requests"><div class="empty">申請はまだありません。</div></div>
+    </div>
     </div>
   </section>
 
