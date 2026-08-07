@@ -701,10 +701,34 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card no-focus-highlight">
       <div class="row mb-2">
-        <div class="section-title mb-0">直近3か月の明細</div>
+        <div class="inline-row-8">
+          <div class="section-title mb-0">直近3か月の明細</div>
+          <button class="modal-icon-btn" id="btn-meisai-search-toggle" title="検索・絞り込み">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+        </div>
         <div class="row-wrap-6">
           <button class="btn small ghost" id="btn-refresh-drive">Drive更新</button>
           <button class="btn small ghost" id="btn-add-file">＋ PDFを追加</button>
+        </div>
+      </div>
+      <div id="meisai-filter-panel" class="is-hidden" style="margin-bottom:12px;padding:10px;background:var(--surface-2);border-radius:10px;">
+        <label class="field mt-0">対象年月</label>
+        <div class="row" style="gap:8px;align-items:center;">
+          <input type="month" id="meisai-filter-from" style="flex:1;">
+          <span class="muted">〜</span>
+          <input type="month" id="meisai-filter-to" style="flex:1;">
+        </div>
+        <div class="row-wrap-6 mt-8">
+          <button class="filter-chip active" data-meisai-cat="salary">明細</button>
+          <button class="filter-chip active" data-meisai-cat="bonus">賞与</button>
+          <button class="filter-chip active" data-meisai-cat="other">その他</button>
+          <button class="filter-chip active" data-meisai-cat="unregistered">未登録</button>
+          <button class="filter-chip active" data-meisai-cat="missing">紛失</button>
+        </div>
+        <div class="row-wrap-6 mt-10">
+          <button class="btn ghost small" id="btn-meisai-filter-reset">条件をクリア</button>
+          <button class="btn small" id="btn-meisai-filter-apply">絞り込む</button>
         </div>
       </div>
       <input class="is-hidden" type="file" id="file-input" accept="application/pdf,image/*" multiple>
@@ -7111,6 +7135,7 @@ function payKeyFor(y, mo, index){
 function renderLedgerRow(container, doc, ym, labelOverride, payKey){
   const row = document.createElement('div');
   const label = labelOverride || `${ym.y}年${ym.mo}月度の明細`;
+  row.dataset.catYm = `${ym.y}-${String(ym.mo).padStart(2,'0')}`;
   if(doc){
     row.className = 'ledger-row';
     const delBtn = (doc.source==='drive' || doc.source==='localfolder') ? '' : `<button class="x-btn" style="font-size:16px;" data-del="${doc.id}">×</button>`;
@@ -7123,6 +7148,9 @@ function renderLedgerRow(container, doc, ym, labelOverride, payKey){
     const fText = viewedAt
       ? `<span class="viewed">${formatViewedTime(viewedAt)}</span>`
       : `${doc.name}${doc.source==='drive' ? '（Drive）' : doc.source==='localfolder' ? '（フォルダ連携）' : ''}`;
+    row.dataset.catType = doc.type || '';
+    row.dataset.catLocal = isLocalOnlyDoc(doc) ? '1' : '0';
+    row.dataset.catRegistered = registered ? '1' : '0';
     row.innerHTML = `
       <div class="dot"></div>
       <div class="info">
@@ -7139,6 +7167,7 @@ function renderLedgerRow(container, doc, ym, labelOverride, payKey){
     if(delEl) delEl.addEventListener('click', (ev)=>{ ev.stopPropagation(); deleteDocument(doc.id); });
   }else{
     row.className = 'ledger-row missing';
+    row.dataset.catMissing = '1';
     row.innerHTML = `
       <div class="dot"></div>
       <div class="info">
@@ -7225,10 +7254,22 @@ function renderMonthDocsSplit(container, docsForMonth, ym, driveLabel, localLabe
   if(localGroup.length > 0) renderMonthDocs(container, localGroup, ym, localLabel, true);
 }
 
+let meisaiFilterCategories = new Set(['salary','bonus','other','unregistered','missing']);
+function meisaiFilterIsActive(){
+  const from = document.getElementById('meisai-filter-from').value;
+  const to = document.getElementById('meisai-filter-to').value;
+  return !!(from || to || meisaiFilterCategories.size < 5);
+}
 function renderMeisaiLists(){
+  if(meisaiFilterIsActive()) renderMeisaiFilteredList();
+  else renderMeisaiDefault();
+}
+function renderMeisaiDefault(){
   const allDocs = [...documents, ...driveDocs];
   const salaryDocs = allDocs.filter(d=>d.type==='salary');
   const bonusDocs = allDocs.filter(d=>d.type==='bonus');
+
+  document.getElementById('btn-show-all').classList.remove('is-hidden');
 
   const recent = getRecentMonths(3);
   const listEl = document.getElementById('meisai-list');
@@ -7275,6 +7316,83 @@ function renderMeisaiLists(){
   const status = document.getElementById('meisai-status');
   status.textContent = allDocs.length ? `${allDocs.length}件の明細（ローカル${documents.length}件・Drive${driveDocs.length}件）` : 'まだ明細が登録されていません。「＋ PDFを追加」またはDrive連携を設定してください。';
 }
+function renderMeisaiFilteredList(){
+  const allDocs = [...documents, ...driveDocs];
+  const salaryDocs = allDocs.filter(d=>d.type==='salary');
+  const bonusDocs = allDocs.filter(d=>d.type==='bonus');
+
+  const fromVal = document.getElementById('meisai-filter-from').value;
+  const toVal = document.getElementById('meisai-filter-to').value;
+  let range;
+  if(fromVal || toVal){
+    const f = (fromVal || toVal).split('-').map(Number);
+    const t = (toVal || fromVal).split('-').map(Number);
+    range = getFullMonthRange([{y:f[0],mo:f[1]},{y:t[0],mo:t[1]}]);
+  }else{
+    range = getFullMonthRange(salaryDocs);
+  }
+
+  const listEl = document.getElementById('meisai-list');
+  listEl.innerHTML = '';
+  document.getElementById('meisai-all').style.display = 'none';
+  document.getElementById('meisai-all').innerHTML = '';
+  document.getElementById('btn-show-all').classList.add('is-hidden');
+  document.getElementById('btn-show-all').textContent = 'すべての明細を表示';
+
+  range.slice().reverse().forEach(ym=>{
+    const docsThisMonth = salaryDocs.filter(d=>d.y===ym.y && d.mo===ym.mo);
+    renderMonthDocsSplit(listEl, docsThisMonth, ym, `${ym.y}年${ym.mo}月度の明細`, `${ym.y}年${ym.mo}月度その他明細L`);
+    const bonusDocsThisMonth = bonusDocs.filter(d=>d.y===ym.y && d.mo===ym.mo);
+    if(bonusDocsThisMonth.length>0) renderMonthDocsSplit(listEl, bonusDocsThisMonth, ym, `${ym.y}年${ym.mo}月度の賞与明細`, `${ym.y}年${ym.mo}月度その他賞与明細L`);
+  });
+
+  const cats = meisaiFilterCategories;
+  let visibleCount = 0;
+  listEl.querySelectorAll('.ledger-row').forEach(row=>{
+    const isMissing = row.dataset.catMissing === '1';
+    const matches = isMissing
+      ? cats.has('missing')
+      : (
+        (cats.has('salary') && row.dataset.catType === 'salary') ||
+        (cats.has('bonus') && row.dataset.catType === 'bonus') ||
+        (cats.has('other') && row.dataset.catLocal === '1') ||
+        (cats.has('unregistered') && row.dataset.catRegistered === '0')
+      );
+    row.style.display = matches ? '' : 'none';
+    if(matches) visibleCount++;
+  });
+
+  const status = document.getElementById('meisai-status');
+  if(visibleCount === 0){
+    listEl.innerHTML = '<div class="empty">条件に一致する明細はありません。</div>';
+  }
+  status.textContent = `絞り込み結果：${visibleCount}件`;
+}
+document.getElementById('btn-meisai-search-toggle').addEventListener('click', ()=>{
+  const panel = document.getElementById('meisai-filter-panel');
+  const nowHidden = panel.classList.toggle('is-hidden');
+  document.getElementById('btn-meisai-search-toggle').classList.toggle('active', !nowHidden);
+});
+document.querySelectorAll('[data-meisai-cat]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const cat = btn.dataset.meisaiCat;
+    if(meisaiFilterCategories.has(cat)){
+      meisaiFilterCategories.delete(cat);
+      btn.classList.remove('active');
+    }else{
+      meisaiFilterCategories.add(cat);
+      btn.classList.add('active');
+    }
+  });
+});
+document.getElementById('btn-meisai-filter-apply').addEventListener('click', renderMeisaiLists);
+document.getElementById('btn-meisai-filter-reset').addEventListener('click', ()=>{
+  document.getElementById('meisai-filter-from').value = '';
+  document.getElementById('meisai-filter-to').value = '';
+  meisaiFilterCategories = new Set(['salary','bonus','other','unregistered','missing']);
+  document.querySelectorAll('[data-meisai-cat]').forEach(btn=>btn.classList.add('active'));
+  renderMeisaiLists();
+});
 document.getElementById('btn-show-all').addEventListener('click', ()=>{
   const el = document.getElementById('meisai-all');
   const showing = el.style.display !== 'none';
