@@ -288,10 +288,11 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 .ledger-row:hover .info .viewed{color:#fff;}
 
 /* --- PC版レイアウト：明細タブのサマリーを左、明細リストを右の2カラムに --- */
+/* --- 有給タブも同様に、有給残日数を左、履歴を右の2カラムに --- */
 @media (min-width: 680px){
   #app, nav.tabbar{max-width:960px;}
-  #view-meisai.active{display:grid;grid-template-columns:minmax(260px,360px) 1fr;align-items:start;gap:16px;}
-  #view-meisai > .card{margin-bottom:0;}
+  #view-meisai.active, #view-yukyu.active{display:grid;grid-template-columns:minmax(260px,360px) 1fr;align-items:start;gap:16px;}
+  #view-meisai > .card, #view-yukyu > .card{margin-bottom:0;}
 }
 </style>
 </head>
