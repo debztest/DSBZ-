@@ -6513,6 +6513,10 @@ document.addEventListener('keydown', (ev)=>{
   const delta = ev.key === 'ArrowLeft' ? -1 : 1;
   const nextIndex = (currentIndex + delta + tabs.length) % tabs.length;
   tabs[nextIndex].click();
+  // click()はactiveクラスの切り替えは行うが、実際のキーボードフォーカスは移動しないため、
+  // 矢印キー移動前にフォーカスされていたタブに枠線（フォーカスリング）が残ってしまう。
+  // 新しくアクティブになったタブへ明示的にフォーカスを移し、枠線がずれないようにする。
+  tabs[nextIndex].focus();
 });
 
 function fillSettingsForm(){
