@@ -313,6 +313,12 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
   .modal-sheet{height:auto;max-height:88vh;border-radius:16px;}
   #leave-types-modal .modal-sheet{max-width:640px;}
 
+  /* お問い合わせモーダルもPC版では、左に基本情報、右に種別・詳細入力の横並びダイアログに */
+  #contact-modal .modal-sheet{max-width:760px;}
+  #contact-modal .modal-body{display:grid;grid-template-columns:220px 1fr;align-items:start;gap:20px;}
+  #contact-modal .two-col-left, #contact-modal .two-col-right{min-width:0;}
+  #contact-modal .two-col-right .divider-16:first-child{display:none;}
+
   /* PC版は文字サイズも少し大きめに（小・中・大のうち「中」がデフォルト） */
   main[data-font-scale="small"]{zoom:1;}
   main[data-font-scale="medium"]{zoom:1.1;}
@@ -630,6 +636,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <button class="x-btn" id="contact-close">×</button>
     </header>
     <div class="modal-body">
+      <div class="two-col-left">
       <label class="field mt-0">お名前</label>
       <input type="text" id="contact-name" placeholder="お名前">
       <label class="field">優先希望度（Sが最優先）</label>
@@ -649,6 +656,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <label class="field">返信希望のメールアドレス</label>
         <input type="email" id="contact-reply-email" placeholder="you@example.com">
       </div>
+      </div>
+      <div class="two-col-right">
       <div class="divider-16"></div>
       <label class="field mt-0">お問い合わせ種別</label>
       <div class="row tag-row" id="contact-category-buttons">
@@ -703,6 +712,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <div id="contact-attachments-list" class="fs-11 mt-6"></div>
       <button class="btn mt-14" id="contact-send">送信する</button>
       <p class="muted mt-8" id="contact-status">送信先：a_aoyama@dsbz.jp（お使いのメールアプリが開きます）</p>
+      </div>
     </div>
   </div>
 </div>
