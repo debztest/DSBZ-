@@ -1707,8 +1707,8 @@ function formatViewedTime(ts){
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
 const APP_VERSION_HTML = '2026.07.13.1';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
-let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyFjjchftTisMBg1EqhgUfaZWObAWAM8MX53E5Izn3IJM9dXAO3F_Xm2k7WSaUayzVs/exec';
-const BOOTSTRAP_DOC_ID = '15GaNuDtOCUW311AS-dKXSbu7x2-mVGHblkIe25KlY4I'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
+let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
+const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
 let scriptUrlBootstrapped = false;
 async function bootstrapScriptUrl(){
   if(scriptUrlBootstrapped) return;
@@ -4528,7 +4528,7 @@ function compressSystemLogs() {
   logSystemEvent('log_compressed', lines.length + '件の操作ログを「' + archiveName + '」へ圧縮しました');
   return lines.length;
 }
-var BOOTSTRAP_DOC_ID = '15GaNuDtOCUW311AS-dKXSbu7x2-mVGHblkIe25KlY4I'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
+var BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
 var APP_VERSION_GAS = '2026.07.13.1'; // このGASコードの版数。デプロイのたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
 
 // マスターフォルダ（管理情報等を格納する親フォルダ）のIDを取得する（未設定時はデフォルト値を返す）

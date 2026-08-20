@@ -57,7 +57,7 @@ function compressSystemLogs() {
   logSystemEvent('log_compressed', lines.length + '件の操作ログを「' + archiveName + '」へ圧縮しました');
   return lines.length;
 }
-var BOOTSTRAP_DOC_ID = '15GaNuDtOCUW311AS-dKXSbu7x2-mVGHblkIe25KlY4I'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
+var BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
 var APP_VERSION_GAS = '2026.07.13.1'; // このGASコードの版数。デプロイのたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
 
 // マスターフォルダ（管理情報等を格納する親フォルダ）のIDを取得する（未設定時はデフォルト値を返す）
