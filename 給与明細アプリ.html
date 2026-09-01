@@ -96,6 +96,7 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .ledger-row:last-child{border-bottom:none;}
 .ledger-row .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;transition:background .15s ease;}
 .ledger-row.missing .dot{background:var(--danger);}
+.ledger-row.pending .dot{background:var(--text-3);}
 .ledger-row .info{flex:1;min-width:0;}
 .ledger-row .info .m{font-size:15px;font-weight:500;}
 .ledger-row .info .f{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s ease;}
@@ -110,10 +111,14 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .ledger-row.missing:hover .info .f{color:var(--text-3);}
 .ledger-row.missing:hover .info .m{color:var(--danger);}
 .ledger-row.missing:hover .dot{background:var(--danger);}
+.ledger-row.pending:hover{background:transparent;color:inherit;}
+.ledger-row.pending:hover .info .f{color:var(--text-3);}
+.ledger-row.pending:hover .dot{background:var(--text-3);}
 .tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;}
 .tag.ok{background:var(--accent-soft);color:var(--accent);}
 .tag.missing{background:var(--danger-soft);color:var(--danger);}
 .tag.warn{background:var(--money-soft);color:var(--money);}
+.tag.pending{background:var(--border);color:var(--text-2);}
 .news-banner{background:#DCF5C4;border:1px solid #A9DE7A;color:#3F6B1F;padding:10px 14px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;}
 .news-banner .dot{width:8px;height:8px;border-radius:50%;background:#5E9C2E;flex-shrink:0;}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;margin:0 auto;animation:spin 0.8s linear infinite;}
@@ -7221,16 +7226,42 @@ function renderLedgerRow(container, doc, ym, labelOverride, payKey){
     const delEl = row.querySelector('[data-del]');
     if(delEl) delEl.addEventListener('click', (ev)=>{ ev.stopPropagation(); deleteDocument(doc.id); });
   }else{
-    row.className = 'ledger-row missing';
-    row.dataset.catMissing = '1';
-    row.innerHTML = `
-      <div class="dot"></div>
-      <div class="info">
-        <div class="m">${ym.y}年${ym.mo}月度紛失</div>
-        <div class="f">この月の明細が登録されていません</div>
-      </div>
-      <span class="tag missing">紛失</span>
-    `;
+    const payday = getPaydayForYM(ym.y, ym.mo);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const daysUntilPayday = Math.round((payday - today) / 86400000);
+    if(daysUntilPayday > 0){
+      row.className = 'ledger-row pending';
+      row.innerHTML = `
+        <div class="dot"></div>
+        <div class="info">
+          <div class="m">${ym.y}年${ym.mo}月度</div>
+          <div class="f">給料日まであと${daysUntilPayday}日です</div>
+        </div>
+        <span class="tag pending">あと${daysUntilPayday}日</span>
+      `;
+    }else if(daysUntilPayday === 0){
+      row.className = 'ledger-row pending';
+      row.innerHTML = `
+        <div class="dot"></div>
+        <div class="info">
+          <div class="m">${ym.y}年${ym.mo}月度</div>
+          <div class="f">本日が給料日です</div>
+        </div>
+        <span class="tag pending">本日</span>
+      `;
+    }else{
+      row.className = 'ledger-row missing';
+      row.dataset.catMissing = '1';
+      row.innerHTML = `
+        <div class="dot"></div>
+        <div class="info">
+          <div class="m">${ym.y}年${ym.mo}月度紛失</div>
+          <div class="f">この月の明細が登録されていません</div>
+        </div>
+        <span class="tag missing">紛失</span>
+      `;
+    }
   }
   container.appendChild(row);
 }
