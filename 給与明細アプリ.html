@@ -57,6 +57,7 @@ main[data-font-scale="large"]{zoom:1.15;}
 .card:not(.no-focus-highlight):focus-within{background:#E3F4FB;border-color:#9BD8EF;}
 .section-title{font-size:13px;font-weight:700;margin:0 0 12px;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;}
 .muted{color:var(--text-2);font-size:12px;}
+.ytd-range-label{color:var(--text);font-size:17px;font-weight:700;}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
 label.field{display:block;font-size:12px;color:var(--text-2);margin:12px 0 4px;}
 label.field:first-child{margin-top:0;}
@@ -824,7 +825,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
           <button class="btn ghost small" id="ytd-next" style="width:auto;">›</button>
         </div>
       </div>
-      <p class="muted mt-0 mb-2" id="ytd-range-label"></p>
+      <p class="ytd-range-label mt-0 mb-2" id="ytd-range-label"></p>
       <div class="row">
         <span class="muted">総支給額</span>
         <span class="mono value-lg" id="ytd-gross">¥0</span>
@@ -1718,7 +1719,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.01.2';
+const APP_VERSION_HTML = '2026.09.01.3';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
