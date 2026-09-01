@@ -1719,7 +1719,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.01.3';
+const APP_VERSION_HTML = '2026.09.01.4';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -8622,29 +8622,20 @@ document.getElementById('ytd-next').addEventListener('click', ()=>{
   renderYTDTotals();
 });
 
-// 年度は4/1始まり・翌年3/31終わりで扱う。ytdYearOffsetは0=今年度、1=1年前の年度…という相対オフセット。
+// 集計は暦年(1/1〜12/31)ベース。ytdYearOffsetは0=今年、1=1年前…という相対オフセット。
 let ytdYearOffset = 0;
-function currentFiscalYearStart(){
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth()+1;
-  return m >= 4 ? y : y - 1;
-}
-function fiscalYearRangeForOffset(offset){
-  const startY = currentFiscalYearStart() - offset;
-  return {
-    startY, startM: 4,
-    endY: startY+1, endM: 3
-  };
+function calendarYearRangeForOffset(offset){
+  const y = new Date().getFullYear() - offset;
+  return { startY: y, startM: 1, endY: y, endM: 12 };
 }
 function renderYTDTotals(){
-  const range = fiscalYearRangeForOffset(ytdYearOffset);
+  const range = calendarYearRangeForOffset(ytdYearOffset);
   const now = new Date();
-  const isCurrentFY = ytdYearOffset === 0;
+  const isCurrentYear = ytdYearOffset === 0;
   const startKey = range.startY*12 + range.startM;
   const fullEndKey = range.endY*12 + range.endM;
   const nowKey = now.getFullYear()*12 + (now.getMonth()+1);
-  const endKey = isCurrentFY ? Math.min(fullEndKey, nowKey) : fullEndKey;
+  const endKey = isCurrentYear ? Math.min(fullEndKey, nowKey) : fullEndKey;
 
   let gross = 0, net = 0;
   Object.keys(payHistory).forEach(ym=>{
@@ -8663,14 +8654,14 @@ function renderYTDTotals(){
   });
 
   const startLabel = `${range.startY}/${String(range.startM).padStart(2,'0')}/01`;
-  const endLabel = isCurrentFY
+  const endLabel = isCurrentYear
     ? `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`
     : `${range.endY}/${String(range.endM).padStart(2,'0')}/31`;
-  const suffix = isCurrentFY ? '今年' : `${ytdYearOffset}年前`;
+  const suffix = isCurrentYear ? '今年' : `${ytdYearOffset}年前`;
   document.getElementById('ytd-range-label').textContent = `${startLabel}〜${endLabel}（${suffix}）`;
   document.getElementById('ytd-gross').textContent = `¥${gross.toLocaleString('en-US')}`;
   document.getElementById('ytd-net').textContent = `¥${net.toLocaleString('en-US')}`;
-  document.getElementById('ytd-next').disabled = isCurrentFY;
+  document.getElementById('ytd-next').disabled = isCurrentYear;
 }
 function renderSummary(){
   document.getElementById('sum-payday').textContent = fmtDate(nextPayday());
