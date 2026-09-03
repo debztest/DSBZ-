@@ -2715,6 +2715,11 @@ document.getElementById('btn-employee-login').addEventListener('click', (ev)=>{
     if(ev.key === 'Enter'){ ev.preventDefault(); document.getElementById('btn-employee-login').click(); }
   });
 });
+['forgot-sei','forgot-mei','forgot-dob'].forEach(fid=>{
+  document.getElementById(fid).addEventListener('keydown', (ev)=>{
+    if(ev.key === 'Enter'){ ev.preventDefault(); document.getElementById('btn-forgot-find').click(); }
+  });
+});
 
 document.getElementById('btn-toggle-password').addEventListener('click', ()=>{
   const input = document.getElementById('login-password');
@@ -2806,7 +2811,7 @@ document.getElementById('btn-forgot-find').addEventListener('click', (ev)=>{
     return;
   }
   withButtonBusy(ev.currentTarget, async ()=>{
-    status.textContent = '確認しています…';
+    status.textContent = '';
     await bootstrapScriptUrl();
     try{
       const url = `${COMPANY_SCRIPT_URL}?action=findUserByInfo&sei=${encodeURIComponent(sei)}&mei=${encodeURIComponent(mei)}&dob=${encodeURIComponent(dob)}`;
