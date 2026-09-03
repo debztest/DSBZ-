@@ -2796,7 +2796,7 @@ document.getElementById('forgot-reset-modal-close').addEventListener('click', ()
 });
 
 let forgotFoundUserId = null;
-document.getElementById('btn-forgot-find').addEventListener('click', async ()=>{
+document.getElementById('btn-forgot-find').addEventListener('click', (ev)=>{
   const status = document.getElementById('forgot-status');
   const sei = document.getElementById('forgot-sei').value.trim();
   const mei = document.getElementById('forgot-mei').value.trim();
@@ -2805,27 +2805,29 @@ document.getElementById('btn-forgot-find').addEventListener('click', async ()=>{
     status.textContent = '苗字・名前・生年月日をすべて入力してください。';
     return;
   }
-  status.textContent = '確認しています…';
-  await bootstrapScriptUrl();
-  try{
-    const url = `${COMPANY_SCRIPT_URL}?action=findUserByInfo&sei=${encodeURIComponent(sei)}&mei=${encodeURIComponent(mei)}&dob=${encodeURIComponent(dob)}`;
-    const data = await jsonpRequest(url);
-    if(data.error){
-      status.textContent = data.error;
-      return;
+  withButtonBusy(ev.currentTarget, async ()=>{
+    status.textContent = '確認しています…';
+    await bootstrapScriptUrl();
+    try{
+      const url = `${COMPANY_SCRIPT_URL}?action=findUserByInfo&sei=${encodeURIComponent(sei)}&mei=${encodeURIComponent(mei)}&dob=${encodeURIComponent(dob)}`;
+      const data = await jsonpRequest(url);
+      if(data.error){
+        status.textContent = data.error;
+        return;
+      }
+      forgotFoundUserId = data.userId;
+      document.getElementById('forgot-userid-display').textContent = data.userId;
+      document.getElementById('forgot-new-password').value = '';
+      document.getElementById('forgot-reset-status').textContent = '';
+      document.getElementById('forgot-password-rule').style.cssText = 'font-size:11px;color:var(--text-2);margin-top:6px;';
+      document.getElementById('forgot-password-rule').textContent = 'パスワードは英字と数字を組み合わせて8文字以上にしてください。';
+      status.textContent = '';
+      document.getElementById('forgot-modal').classList.add('hidden');
+      document.getElementById('forgot-reset-modal').classList.remove('hidden');
+    }catch(e){
+      status.textContent = '確認に失敗しました：' + e.message;
     }
-    forgotFoundUserId = data.userId;
-    document.getElementById('forgot-userid-display').textContent = data.userId;
-    document.getElementById('forgot-new-password').value = '';
-    document.getElementById('forgot-reset-status').textContent = '';
-    document.getElementById('forgot-password-rule').style.cssText = 'font-size:11px;color:var(--text-2);margin-top:6px;';
-    document.getElementById('forgot-password-rule').textContent = 'パスワードは英字と数字を組み合わせて8文字以上にしてください。';
-    status.textContent = '';
-    document.getElementById('forgot-modal').classList.add('hidden');
-    document.getElementById('forgot-reset-modal').classList.remove('hidden');
-  }catch(e){
-    status.textContent = '確認に失敗しました：' + e.message;
-  }
+  });
 });
 
 document.getElementById('btn-toggle-forgot-password').addEventListener('click', ()=>{
