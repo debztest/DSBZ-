@@ -3272,11 +3272,17 @@ function loadUserDetailIntoForm(detail){
   }
 }
 
-document.getElementById('admin-user-panel').addEventListener('keydown', (ev)=>{
+// 何かの入力欄にフォーカスがある状態で上下キーを押すと、次/前の入力欄に移動する。
+// type="number"・type="date"・type="month"はブラウザ標準で上下キーが値の増減に使われるため対象外にする。
+const ARROW_NAV_INPUT_TYPES = ['text','email','password'];
+document.addEventListener('keydown', (ev)=>{
   if(ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
   const target = ev.target;
-  if(!target || target.tagName !== 'INPUT' || target.type !== 'text') return;
-  const fields = Array.from(document.getElementById('admin-user-panel').querySelectorAll('input[type="text"]'));
+  if(!target || target.tagName !== 'INPUT' || !ARROW_NAV_INPUT_TYPES.includes(target.type)) return;
+  const selector = ARROW_NAV_INPUT_TYPES.map(t=>`input[type="${t}"]`).join(',');
+  // 開いているモーダルの中ならその中だけ、そうでなければ表示中のタブの中だけを対象にする
+  const container = target.closest('.modal-overlay:not(.hidden)') || target.closest('.view.active') || document.body;
+  const fields = Array.from(container.querySelectorAll(selector)).filter(el=>el.offsetParent !== null);
   const idx = fields.indexOf(target);
   if(idx === -1) return;
   const nextField = fields[ev.key === 'ArrowDown' ? idx + 1 : idx - 1];
