@@ -1726,7 +1726,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.01.6';
+const APP_VERSION_HTML = '2026.09.01.7';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -5485,16 +5485,10 @@ function doGet(e) {
             propsCV.setProperty('LAST_NOTIFIED_HTML_VERSION', htmlVersionCV);
           }
         }
-        if (changedPartsCV.length > 0) {
-          var newsDocCV = getOrCreateMasterDoc('ニュース');
-          var newsIdCV = new Date().getTime();
-          var titleCV = 'システムが更新されました';
-          var msgCV = changedPartsCV.join('・') + 'が更新されました。表示がおかしい場合は再読み込みをお試しください。';
-          appendLine(newsDocCV, [newsIdCV, 'all', 'maintenance', titleCV, '', '', msgCV].join(':'));
-          out = { success: true, notified: true };
-        } else {
-          out = { success: true, notified: false };
-        }
+        // システム更新のお知らせは更新内容ごとに手動で詳しく投稿する運用にしたため、
+        // ここでの自動投稿（「システムが更新されました」の定型文）は行わない。
+        // バージョンの記録だけ更新しておく。
+        out = { success: true, notified: false };
       } finally {
         lockCV.releaseLock();
       }
@@ -7561,6 +7555,9 @@ function serializeSettingsText(){
   }
   lines.push('');
   lines.push(`基本給:${settings.baseSalary||0}`);
+  if(settings.standardHours){
+    lines.push(`所定労働時間:${settings.standardHours}`);
+  }
   lines.push('');
   if(settings.commute && settings.commute.mode){
     const c = settings.commute;
