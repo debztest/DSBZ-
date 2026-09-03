@@ -492,6 +492,12 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <span class="muted fs-12" id="news-bulk-count">0件選択中</span>
       <button type="button" class="btn small" style="width:auto;background:var(--danger);" id="btn-news-bulk-execute">選択したものを削除</button>
     </div>
+    <div id="news-read-bulk-bar" style="padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" class="btn ghost small" style="width:auto;" id="btn-news-read-all">まとめて既読にする</button>
+      <button type="button" class="btn ghost small" style="width:auto;" data-read-priority="critical">🔴を既読にする</button>
+      <button type="button" class="btn ghost small" style="width:auto;" data-read-priority="maintenance">🟡を既読にする</button>
+      <button type="button" class="btn ghost small" style="width:auto;" data-read-priority="normal">💧を既読にする</button>
+    </div>
     <div class="modal-body" id="news-modal-body"></div>
   </div>
 </div>
@@ -1719,7 +1725,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.01.4';
+const APP_VERSION_HTML = '2026.09.01.5';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -1944,6 +1950,7 @@ function resetNewsFilterAndBulkState(){
   document.getElementById('news-filter-panel').classList.add('is-hidden');
   document.getElementById('btn-news-filter-toggle').classList.remove('active');
   document.getElementById('news-bulk-bar').classList.add('is-hidden');
+  document.getElementById('news-read-bulk-bar').classList.remove('is-hidden');
   document.getElementById('btn-news-bulk-toggle').classList.remove('active');
   document.getElementById('news-modal-header').classList.remove('news-modal-bulk-mode');
   updateNewsBulkCount();
@@ -2048,6 +2055,7 @@ document.getElementById('btn-news-bulk-toggle').addEventListener('click', ()=>{
   updateNewsBulkCount();
   document.getElementById('btn-news-bulk-toggle').classList.toggle('active', newsBulkMode);
   document.getElementById('news-bulk-bar').classList.toggle('is-hidden', !newsBulkMode);
+  document.getElementById('news-read-bulk-bar').classList.toggle('is-hidden', newsBulkMode);
   document.getElementById('news-modal-header').classList.toggle('news-modal-bulk-mode', newsBulkMode);
   if(newsModalOnlyUnread !== null) renderNewsModalList(newsModalOnlyUnread);
 });
@@ -2075,6 +2083,23 @@ document.getElementById('btn-news-bulk-execute').addEventListener('click', async
   }catch(e){
     await showAlertModal('削除に失敗しました：' + e.message);
   }
+});
+
+// 一覧に今表示されている（フィルター適用後の）お知らせを対象に一括既読する。
+// priorityを指定するとその分類（🔴critical/🟡maintenance/💧normal）だけに絞る。
+function markVisibleNewsRead(priority){
+  const relevant = relevantNews(lastFetchedNews).slice().reverse();
+  let list = newsModalOnlyUnread ? relevant.filter(n=>!isReadNews(n)) : relevant;
+  if(!newsModalOnlyUnread) list = applyNewsFilters(list);
+  if(priority) list = list.filter(n=>(n.priority||'normal')===priority);
+  const ids = list.filter(n=>!isReadNews(n)).map(n=>n.id);
+  if(ids.length===0) return;
+  markNewsRead(ids);
+  refreshNewsViewsAfterReadChange();
+}
+document.getElementById('btn-news-read-all').addEventListener('click', ()=>markVisibleNewsRead(null));
+document.querySelectorAll('#news-read-bulk-bar [data-read-priority]').forEach(btn=>{
+  btn.addEventListener('click', ()=>markVisibleNewsRead(btn.dataset.readPriority));
 });
 
 function renderLeaveTypesList(types){
