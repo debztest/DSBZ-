@@ -114,6 +114,7 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .ledger-row.missing:hover .info .m{color:var(--danger);}
 .ledger-row.missing:hover .dot{background:var(--danger);}
 .ledger-row.pending:hover{background:transparent;color:inherit;}
+.ledger-row.pending:hover .info .m{color:var(--text);}
 .ledger-row.pending:hover .info .f{color:var(--text-3);}
 .ledger-row.pending:hover .dot{background:var(--text-3);}
 .tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;}
@@ -1725,7 +1726,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.01.5';
+const APP_VERSION_HTML = '2026.09.01.6';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
