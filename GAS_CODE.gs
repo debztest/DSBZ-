@@ -974,16 +974,10 @@ function doGet(e) {
             propsCV.setProperty('LAST_NOTIFIED_HTML_VERSION', htmlVersionCV);
           }
         }
-        if (changedPartsCV.length > 0) {
-          var newsDocCV = getOrCreateMasterDoc('ニュース');
-          var newsIdCV = new Date().getTime();
-          var titleCV = 'システムが更新されました';
-          var msgCV = changedPartsCV.join('・') + 'が更新されました。表示がおかしい場合は再読み込みをお試しください。';
-          appendLine(newsDocCV, [newsIdCV, 'all', 'maintenance', titleCV, '', '', msgCV].join(':'));
-          out = { success: true, notified: true };
-        } else {
-          out = { success: true, notified: false };
-        }
+        // システム更新のお知らせは更新内容ごとに手動で詳しく投稿する運用にしたため、
+        // ここでの自動投稿（「システムが更新されました」の定型文）は行わない。
+        // バージョンの記録だけ更新しておく。
+        out = { success: true, notified: false };
       } finally {
         lockCV.releaseLock();
       }
@@ -1947,6 +1941,13 @@ function doGet(e) {
     return ContentService.createTextOutput(callback + '(' + json + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+
+// パスワードなどをURLに載せたくない呼び出し（ログイン等）のためのPOST口。
+// application/x-www-form-urlencodedで送られたPOSTボディはe.parameterにGETと同じ形で入るため、
+// doGetにそのまま委譲できる。
+function doPost(e) {
+  return doGet(e);
 }
 
 // この関数は「トリガー」（時間主導型・毎日実行）として管理者が1回だけ設定してください。

@@ -2607,8 +2607,16 @@ async function doEmployeeLogin(id, password){
   status.textContent = 'ログインしています…';
   await bootstrapScriptUrl();
   try{
-    const url = `${COMPANY_SCRIPT_URL}?action=employeeLogin&id=${encodeURIComponent(id)}&password=${encodeURIComponent(password)}`;
-    const data = await jsonpRequest(url);
+    // パスワードをURLに載せない（クロスサイトのscriptとして読み込む形が、フィッシングパターンと
+    // 誤認識されGoogleアカウントのセキュリティ機能に阻まれることがあるため）POST方式をまず試し、
+    // 何らかの理由で失敗した場合のみ、従来のJSONP方式にフォールバックする。
+    let data;
+    try{
+      data = await postRequest(COMPANY_SCRIPT_URL, {action:'employeeLogin', id, password});
+    }catch(postErr){
+      const url = `${COMPANY_SCRIPT_URL}?action=employeeLogin&id=${encodeURIComponent(id)}&password=${encodeURIComponent(password)}`;
+      data = await jsonpRequest(url);
+    }
     if(data.error){
       status.textContent = `${data.error}（他の端末やタブですでにログインしていませんか？IDとパスワードを再度ご確認ください）`;
       return;
@@ -6467,6 +6475,13 @@ function doGet(e) {
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 
+// パスワードなどをURLに載せたくない呼び出し（ログイン等）のためのPOST口。
+// application/x-www-form-urlencodedで送られたPOSTボディはe.parameterにGETと同じ形で入るため、
+// doGetにそのまま委譲できる。
+function doPost(e) {
+  return doGet(e);
+}
+
 // この関数は「トリガー」（時間主導型・毎日実行）として管理者が1回だけ設定してください。
 // Apps Scriptエディタ左側の時計アイコン→「トリガーを追加」→実行する関数：checkDeletionSchedule→
 // イベントの種類：時間主導型→日付ベースのタイマー→午前2時〜3時など、好きな時間帯を選んでください。
@@ -7551,6 +7566,16 @@ function jsonpRequest(url){
     script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
     document.head.appendChild(script);
   });
+}
+
+// パスワードなど機微な値をURLに載せたくない場合はこちらを使う。
+// GAS側はform-urlencodedのPOSTをdoGetと同じくe.parameterで受け取れるようにしてある
+// （doPostがdoGetに委譲する実装）。callbackを付けないので、応答は素のJSONで返る。
+async function postRequest(url, params){
+  const body = new URLSearchParams(params);
+  const res = await fetch(url, { method: 'POST', body });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
 }
 
 function pad2(n){ return String(n).padStart(2,'0'); }
