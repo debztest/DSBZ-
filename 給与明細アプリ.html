@@ -36,6 +36,14 @@ body{min-height:100vh;display:flex;justify-content:center;}
 #app{width:100%;max-width:480px;min-height:100vh;background:var(--bg);display:none;flex-direction:column;position:relative;}
 .login-gate{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;}
 .login-gate.hidden{display:none;}
+.splash-screen{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;align-items:center;justify-content:center;transition:opacity .35s ease;}
+.splash-screen.is-fading{opacity:0;pointer-events:none;}
+.splash-screen img{width:96px;height:96px;border-radius:22px;box-shadow:0 8px 24px rgba(91,58,148,0.25);animation:splash-pop .55s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes splash-pop{
+  0%{transform:scale(.4);opacity:0;}
+  60%{transform:scale(1.1);opacity:1;}
+  100%{transform:scale(1);opacity:1;}
+}
 .login-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 24px;}
 .login-card h1{font-size:20px;font-weight:700;margin:0 0 6px;text-align:center;}
 .login-card p.sub{font-size:12px;color:var(--text-2);text-align:center;margin:0 0 24px;}
@@ -344,6 +352,21 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 </style>
 </head>
 <body>
+<div class="splash-screen" id="splash-screen">
+  <img id="splash-icon" alt="">
+</div>
+<script>
+(function(){
+  var icon = document.querySelector('link[rel="icon"]');
+  var img = document.getElementById('splash-icon');
+  if(icon) img.src = icon.href;
+  setTimeout(function(){
+    var splash = document.getElementById('splash-screen');
+    splash.classList.add('is-fading');
+    setTimeout(function(){ splash.remove(); }, 400);
+  }, 900);
+})();
+</script>
 <div class="login-gate" id="login-gate">
   <div class="login-card">
     <h1>DSBZ給与</h1>
@@ -1726,7 +1749,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.01.7';
+const APP_VERSION_HTML = '2026.09.04.1';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
