@@ -29,6 +29,8 @@
   --money-soft:#F8EFD7;
   --danger:#B23B30;
   --danger-soft:#F5E2DF;
+  --success:#2F7D4F;
+  --success-soft:#DCF2E3;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Zen Kaku Gothic New',sans-serif;-webkit-tap-highlight-color:transparent;}
@@ -106,11 +108,12 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .ledger-row:last-child{border-bottom:none;}
 .ledger-row .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;transition:background .15s ease;}
 .ledger-row.missing .dot{background:var(--danger);}
-.ledger-row.pending .dot{background:var(--text-3);}
+.ledger-row.pending .dot{background:var(--success);}
 .ledger-row .info{flex:1;min-width:0;}
 .ledger-row .info .m{font-size:15px;font-weight:500;}
 .ledger-row .info .f{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s ease;}
 .ledger-row.missing .info .m{color:var(--danger);}
+.ledger-row.pending .info .m{color:var(--success);}
 .ledger-row:hover{background:var(--accent);color:#fff;}
 .ledger-row:hover .info .f{color:rgba(255,255,255,0.85);}
 .ledger-row:hover .info .m{color:#fff;}
@@ -122,14 +125,14 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .ledger-row.missing:hover .info .m{color:var(--danger);}
 .ledger-row.missing:hover .dot{background:var(--danger);}
 .ledger-row.pending:hover{background:transparent;color:inherit;}
-.ledger-row.pending:hover .info .m{color:var(--text);}
+.ledger-row.pending:hover .info .m{color:var(--success);}
 .ledger-row.pending:hover .info .f{color:var(--text-3);}
-.ledger-row.pending:hover .dot{background:var(--text-3);}
+.ledger-row.pending:hover .dot{background:var(--success);}
 .tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;}
 .tag.ok{background:var(--accent-soft);color:var(--accent);}
 .tag.missing{background:var(--danger-soft);color:var(--danger);}
 .tag.warn{background:var(--money-soft);color:var(--money);}
-.tag.pending{background:var(--border);color:var(--text-2);}
+.tag.pending{background:var(--success-soft);color:var(--success);}
 .news-banner{background:#DCF5C4;border:1px solid #A9DE7A;color:#3F6B1F;padding:10px 14px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;}
 .news-banner .dot{width:8px;height:8px;border-radius:50%;background:#5E9C2E;flex-shrink:0;}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;margin:0 auto;animation:spin 0.8s linear infinite;}
@@ -1749,7 +1752,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.1';
+const APP_VERSION_HTML = '2026.09.04.2';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -7315,20 +7318,10 @@ function renderLedgerRow(container, doc, ym, labelOverride, payKey){
       row.innerHTML = `
         <div class="dot"></div>
         <div class="info">
-          <div class="m">${ym.y}年${ym.mo}月度</div>
+          <div class="m">${ym.y}年${ym.mo}月度の明細</div>
           <div class="f">給料日まであと${daysUntilPayday}日です</div>
         </div>
         <span class="tag pending">あと${daysUntilPayday}日</span>
-      `;
-    }else if(daysUntilPayday === 0){
-      row.className = 'ledger-row pending';
-      row.innerHTML = `
-        <div class="dot"></div>
-        <div class="info">
-          <div class="m">${ym.y}年${ym.mo}月度</div>
-          <div class="f">本日が給料日です</div>
-        </div>
-        <span class="tag pending">本日</span>
       `;
     }else{
       row.className = 'ledger-row missing';
@@ -8365,6 +8358,12 @@ function nextPayday(){
   }
   return candidate;
 }
+function isSameDate(a, b){
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+function paydayCrownSuffix(paydayDate){
+  return isSameDate(paydayDate, new Date()) ? ' 👑' : '';
+}
 function paydayForMonth(y, mo){
   return getPaydayForYM(y, mo);
 }
@@ -8421,7 +8420,8 @@ function loadOvertimeHoursField(){
 }
 loadOvertimeHoursField();
 function renderOvertime(){
-  document.getElementById('payday-next').textContent = fmtDate(nextPayday());
+  const otPayday = nextPayday();
+  document.getElementById('payday-next').textContent = fmtDate(otPayday) + paydayCrownSuffix(otPayday);
   const monthStr = document.getElementById('ot-month').value || currentMonthStr();
   const [y, mo] = monthStr.split('-').map(Number);
   const hours = parseFloat(document.getElementById('ot-hours').value) || 0;
@@ -8748,7 +8748,8 @@ function renderYTDTotals(){
   document.getElementById('ytd-next').disabled = isCurrentYear;
 }
 function renderSummary(){
-  document.getElementById('sum-payday').textContent = fmtDate(nextPayday());
+  const summaryPayday = nextPayday();
+  document.getElementById('sum-payday').textContent = fmtDate(summaryPayday) + paydayCrownSuffix(summaryPayday);
   document.getElementById('sum-closeday').textContent = fmtDate(nextClosingDate());
   document.getElementById('sum-bonus').textContent = fmtDate(nextBonusDate());
   renderYTDTotals();
