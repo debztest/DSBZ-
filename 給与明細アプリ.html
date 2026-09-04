@@ -832,6 +832,11 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       </div>
       <label class="field">使用日</label>
       <input type="date" id="yukyu-input-date">
+      <label class="field">日数</label>
+      <div class="row-wrap-6">
+        <button type="button" class="btn small outline daytype-btn active" data-daytype="1">一日</button>
+        <button type="button" class="btn small outline daytype-btn" data-daytype="0.5">半日</button>
+      </div>
       <label class="field" id="yukyu-note-label">理由（任意）</label>
       <input type="text" id="yukyu-input-note" placeholder="私用のため">
       <button class="btn mt-14 w-full" id="yukyu-minus">この日を使用申請する</button>
@@ -1758,7 +1763,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.5';
+const APP_VERSION_HTML = '2026.09.04.6';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -8201,8 +8206,16 @@ async function deleteLeaveEntry(item){
   }catch(e){ /* 通知失敗は無視 */ }
 }
 
+let yukyuDayType = 1;
+document.querySelectorAll('#view-yukyu .daytype-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#view-yukyu .daytype-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    yukyuDayType = parseFloat(btn.dataset.daytype);
+  });
+});
 async function applyLeave(){
-  const days = 1;
+  const days = yukyuDayType;
   const dateInput = document.getElementById('yukyu-input-date').value;
   if(!dateInput){
     await showAlertModal('使用日を入力してください。');
@@ -8215,7 +8228,8 @@ async function applyLeave(){
   const noteInput = document.getElementById('yukyu-input-note').value.trim();
   const note = noteInput || '私用のため';
   const dateStr = dateInput;
-  if(!(await showConfirmModal(`${isoToDisplay(dateStr)}を有給として使用申請しますか？\n理由：${note}`))) return;
+  const daysLabel = days === 0.5 ? '半日' : '1日';
+  if(!(await showConfirmModal(`${isoToDisplay(dateStr)}を有給として${daysLabel}、使用申請しますか？\n理由：${note}`))) return;
   const consumedFrom = deductLeave(days);
   const isPendingUse = !currentIsAdmin;
   const requestId = isPendingUse ? genRequestId() : null;
@@ -8227,6 +8241,8 @@ async function applyLeave(){
   renderSummary();
   document.getElementById('yukyu-input-note').value = '';
   document.getElementById('yukyu-input-date').value = isoDate(new Date());
+  yukyuDayType = 1;
+  document.querySelectorAll('#view-yukyu .daytype-btn').forEach(b=>b.classList.toggle('active', b.dataset.daytype==='1'));
   const useBtn = document.getElementById('yukyu-minus');
   setButtonLoading(useBtn, '保存中…');
   try{
