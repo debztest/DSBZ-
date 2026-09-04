@@ -62,6 +62,9 @@ main[data-font-scale="large"]{zoom:1.15;}
 .view{display:none;}
 .view.active{display:block;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;transition:background .15s ease,border-color .15s ease;}
+/* 保守タブは項目数が多く見分けにくいため、枠を太く・左に色帯を付けて1項目ずつ目立たせる（全項目で統一の見た目） */
+#view-maintenance .card{border-width:2px;border-left-width:6px;border-left-color:var(--accent);}
+#view-maintenance .section-title{font-size:14px;}
 .card.searching{background:#E3F4FB;border-color:#9BD8EF;}
 .card.admin-closed-hint{background:#E5F6EA;border-color:#A9DDB9;}
 .card:not(.no-focus-highlight):focus-within{background:#E3F4FB;border-color:#9BD8EF;}
@@ -1192,7 +1195,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
   <section class="view" id="view-maintenance">
     <div class="card" id="card-admin-news" style="display:none;">
       <div class="row mb-2">
-        <div class="section-title mb-0">ニュースを送信（管理者用）</div>
+        <div class="section-title mb-0">📢 ニュースを送信（管理者用）</div>
         <button class="btn ghost small" id="btn-show-deleted-news">削除済みを確認</button>
       </div>
       <label class="field mt-0">対象</label>
@@ -1214,7 +1217,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <p class="muted mt-6" id="post-news-status"></p>
     </div>
     <div class="card" id="card-gas-update" style="display:none;">
-      <div class="section-title">GAS更新依頼（管理者用）</div>
+      <div class="section-title">🛠️ GAS更新依頼（管理者用）</div>
       <p class="muted mt-0">更新後のGAS_CODE.gsファイルと更新目的を添えて、担当者に更新を依頼できます。</p>
       <label class="field mt-0">更新後のGASファイル（.gs・必須）</label>
       <input type="file" id="gasupdate-file" accept=".gs,text/plain">
@@ -1226,7 +1229,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card" id="card-admin-logs" style="display:none;">
       <div class="row mb-2">
-        <div class="section-title mb-0">操作ログ（管理者用）</div>
+        <div class="section-title mb-0">📋 操作ログ（管理者用）</div>
         <button class="icon-btn" id="btn-copy-logs" title="クリップボードにコピー">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </button>
@@ -1241,7 +1244,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card">
       <div class="row mb-2">
-        <div class="section-title mb-0">新規ユーザー追加（管理者用）</div>
+        <div class="section-title mb-0">➕ 新規ユーザー追加（管理者用）</div>
         <button class="btn ghost small" id="btn-new-user-toggle">追加</button>
       </div>
       <div id="new-user-form" style="display:none;margin-top:10px;">
@@ -1288,7 +1291,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card" id="card-admin-users">
       <div class="row mb-2">
-        <div class="section-title mb-0">ユーザー管理（管理者用）</div>
+        <div class="section-title mb-0">👥 ユーザー管理（管理者用）</div>
         <button class="btn ghost small" id="btn-admin-reset">リセット</button>
       </div>
       <label class="field mt-0">社員ID または 苗字（ひらがな）</label>
@@ -1360,7 +1363,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card" id="card-admin-special-periods">
       <div class="row mb-2">
-        <div class="section-title mb-0">特別休暇・有給関連の設定（管理者用）</div>
+        <div class="section-title mb-0">🏖️ 特別休暇・有給関連の設定（管理者用）</div>
         <button class="btn ghost small collapsible-toggle">開く</button>
       </div>
       <div class="collapsible-body is-hidden">
@@ -1398,7 +1401,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card" id="card-admin-leave-types">
       <div class="row mb-2">
-        <div class="section-title mb-0">休暇制度の管理（管理者用）</div>
+        <div class="section-title mb-0">📖 休暇制度の管理（管理者用）</div>
         <button class="btn ghost small collapsible-toggle">開く</button>
       </div>
       <div class="collapsible-body is-hidden">
@@ -1781,7 +1784,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.12';
+const APP_VERSION_HTML = '2026.09.04.13';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
