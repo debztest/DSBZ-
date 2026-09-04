@@ -265,6 +265,8 @@ nav.tabbar button svg{width:20px;height:20px;}
 .news-detail-title-box{background:#fff;border:1px solid #A9DE7A;border-radius:10px;padding:14px;text-align:center;font-size:16px;font-weight:700;margin-bottom:14px;}
 .news-detail-content-box{background:#fff;border:1px solid #A9DE7A;border-radius:14px;padding:16px;min-height:220px;font-size:14px;line-height:1.7;white-space:pre-wrap;}
 .news-detail-actions{display:flex;gap:10px;margin-top:16px;}
+#news-detail-read-actions{justify-content:center;}
+#news-detail-read-actions #news-detail-keep-unread{width:auto;padding-left:28px;padding-right:28px;}
 .news-detail-actions .btn{width:auto;flex:1;padding:12px 10px;font-size:13px;}
 
 /* --- confirm/alert replacement modal --- */
@@ -598,7 +600,6 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         </div>
         <div class="news-detail-actions" id="news-detail-read-actions">
           <button class="btn ghost" id="news-detail-keep-unread">未読のままにする</button>
-          <button class="btn" id="news-detail-mark-read">既読にする</button>
           <button class="btn is-hidden" id="news-detail-delete" style="background:var(--danger);">削除</button>
         </div>
       </div>
@@ -1764,7 +1765,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.8';
+const APP_VERSION_HTML = '2026.09.04.9';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -1878,7 +1879,6 @@ function openNewsDetail(n){
   currentTransportRequest = parseTransportRequestMessage(n.message);
   if(currentTransportRequest) currentTransportRequest.status = 'pending';
   const keepUnreadBtn = document.getElementById('news-detail-keep-unread');
-  const markReadBtn = document.getElementById('news-detail-mark-read');
   const deleteBtn = document.getElementById('news-detail-delete');
   const editIcon = document.getElementById('news-detail-edit-icon');
   if(currentLeaveRequest){
@@ -1892,7 +1892,6 @@ function openNewsDetail(n){
     document.getElementById('news-detail-read-actions').classList.toggle('is-hidden', currentIsAdmin && !alreadyResolved);
     editIcon.classList.add('is-hidden');
     keepUnreadBtn.classList.remove('is-hidden');
-    markReadBtn.classList.toggle('is-hidden', alreadyRead);
     deleteBtn.classList.toggle('is-hidden', !(currentIsAdmin && alreadyRead));
   }else if(currentTransportRequest){
     const req = currentTransportRequest;
@@ -1904,7 +1903,6 @@ function openNewsDetail(n){
     document.getElementById('news-detail-read-actions').classList.toggle('is-hidden', currentIsAdmin && !alreadyResolved);
     editIcon.classList.add('is-hidden');
     keepUnreadBtn.classList.remove('is-hidden');
-    markReadBtn.classList.toggle('is-hidden', alreadyRead);
     deleteBtn.classList.toggle('is-hidden', !(currentIsAdmin && alreadyRead));
   }else{
     const editedNote = n.editedAt ? formatEditedTime(n.editedAt) : '';
@@ -1914,7 +1912,6 @@ function openNewsDetail(n){
     document.getElementById('news-detail-read-actions').classList.remove('is-hidden');
     editIcon.classList.toggle('is-hidden', !currentIsAdmin);
     keepUnreadBtn.classList.remove('is-hidden');
-    markReadBtn.classList.toggle('is-hidden', alreadyRead);
     deleteBtn.classList.toggle('is-hidden', !(currentIsAdmin && alreadyRead));
   }
   document.getElementById('news-detail-admin-tag').classList.toggle('is-hidden', n.scope !== 'admin');
@@ -2523,12 +2520,6 @@ document.getElementById('news-detail-keep-unread').addEventListener('click', ()=
   refreshNewsViewsAfterReadChange();
   currentDetailNews = null;
 });
-document.getElementById('news-detail-mark-read').addEventListener('click', ()=>{
-  if(currentDetailNews) markNewsRead([currentDetailNews.id]);
-  document.getElementById('news-detail-modal').classList.add('hidden');
-  refreshNewsViewsAfterReadChange();
-  currentDetailNews = null;
-});
 
 
 
@@ -2987,7 +2978,9 @@ document.getElementById('btn-post-news').addEventListener('click', async ()=>{
   }
 });
 document.getElementById('news-detail-close-x').addEventListener('click', ()=>{
+  if(currentDetailNews) markNewsRead([currentDetailNews.id]);
   document.getElementById('news-detail-modal').classList.add('hidden');
+  refreshNewsViewsAfterReadChange();
   currentDetailNews = null;
   currentLeaveRequest = null;
 });
