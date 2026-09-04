@@ -1765,7 +1765,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.9';
+const APP_VERSION_HTML = '2026.09.04.10';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2915,6 +2915,22 @@ document.getElementById('btn-forgot-reset').addEventListener('click', async ()=>
   }
 });
 
+// 起動時のスプラッシュ(body直下のインラインscript)と同じ見た目を、ログアウト時にも出す。
+// 起動時のものはDOMから消してしまう一度限りの実装なので、ここでは同じ演出を作り直せる関数にしてある。
+function showSplash(){
+  const splash = document.createElement('div');
+  splash.className = 'splash-screen';
+  const img = document.createElement('img');
+  img.alt = '';
+  const iconLink = document.querySelector('link[rel="icon"]');
+  if(iconLink) img.src = iconLink.href;
+  splash.appendChild(img);
+  document.body.appendChild(splash);
+  setTimeout(()=>{
+    splash.classList.add('is-fading');
+    setTimeout(()=>splash.remove(), 400);
+  }, 900);
+}
 document.getElementById('btn-employee-logout').addEventListener('click', async ()=>{
   if(!(await showConfirmModal('ログアウトしますか？'))) return;
   settings.driveFolderId = '';
@@ -2928,6 +2944,7 @@ document.getElementById('btn-employee-logout').addEventListener('click', async (
   document.getElementById('login-status').textContent = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-gate').classList.remove('hidden');
+  showSplash();
 });
 
 document.getElementById('btn-change-password').addEventListener('click', async ()=>{
