@@ -1765,7 +1765,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.10';
+const APP_VERSION_HTML = '2026.09.04.11';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -8818,7 +8818,7 @@ function renderYTDTotals(){
   document.getElementById('ytd-range-label').textContent = `${startLabel}〜${endLabel}（${suffix}）`;
   document.getElementById('ytd-gross').textContent = `¥${gross.toLocaleString('en-US')}`;
   document.getElementById('ytd-net').textContent = `¥${net.toLocaleString('en-US')}`;
-  document.getElementById('ytd-next').disabled = isCurrentYear;
+  document.getElementById('ytd-next').classList.toggle('is-hidden', isCurrentYear);
 }
 function renderSummary(){
   const summaryPayday = nextPayday();
