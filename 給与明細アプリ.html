@@ -367,11 +367,15 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 </div>
 <script>
 (function(){
+  var splash = document.getElementById('splash-screen');
+  if(window.innerWidth < 680){
+    splash.remove();
+    return;
+  }
   var icon = document.querySelector('link[rel="icon"]');
   var img = document.getElementById('splash-icon');
   if(icon) img.src = icon.href;
   setTimeout(function(){
-    var splash = document.getElementById('splash-screen');
     splash.classList.add('is-fading');
     setTimeout(function(){ splash.remove(); }, 400);
   }, 900);
@@ -1784,7 +1788,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.16';
+const APP_VERSION_HTML = '2026.09.04.17';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2940,7 +2944,9 @@ document.getElementById('btn-forgot-reset').addEventListener('click', async ()=>
 
 // 起動時のスプラッシュ(body直下のインラインscript)と同じ見た目を、ログアウト時にも出す。
 // 起動時のものはDOMから消してしまう一度限りの実装なので、ここでは同じ演出を作り直せる関数にしてある。
+// スマホ幅では起動時と同様にスキップする(ホーム画面起動時など、OS側に同種の演出が既にあるため)。
 function showSplash(){
+  if(window.innerWidth < 680) return;
   const splash = document.createElement('div');
   splash.className = 'splash-screen';
   const img = document.createElement('img');
