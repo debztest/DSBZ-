@@ -1943,13 +1943,6 @@ function doGet(e) {
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 
-// パスワードなどをURLに載せたくない呼び出し（ログイン等）のためのPOST口。
-// application/x-www-form-urlencodedで送られたPOSTボディはe.parameterにGETと同じ形で入るため、
-// doGetにそのまま委譲できる。
-function doPost(e) {
-  return doGet(e);
-}
-
 // この関数は「トリガー」（時間主導型・毎日実行）として管理者が1回だけ設定してください。
 // Apps Scriptエディタ左側の時計アイコン→「トリガーを追加」→実行する関数：checkDeletionSchedule→
 // イベントの種類：時間主導型→日付ベースのタイマー→午前2時〜3時など、好きな時間帯を選んでください。

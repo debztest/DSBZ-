@@ -1758,7 +1758,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.4';
+const APP_VERSION_HTML = '2026.09.04.5';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2647,16 +2647,10 @@ async function doEmployeeLogin(id, password){
   status.textContent = 'ログインしています…';
   await bootstrapScriptUrl();
   try{
-    // パスワードをURLに載せない（クロスサイトのscriptとして読み込む形が、フィッシングパターンと
-    // 誤認識されGoogleアカウントのセキュリティ機能に阻まれることがあるため）POST方式をまず試し、
-    // 何らかの理由で失敗した場合のみ、従来のJSONP方式にフォールバックする。
-    let data;
-    try{
-      data = await postRequest(COMPANY_SCRIPT_URL, {action:'employeeLogin', id, password});
-    }catch(postErr){
-      const url = `${COMPANY_SCRIPT_URL}?action=employeeLogin&id=${encodeURIComponent(id)}&password=${encodeURIComponent(password)}`;
-      data = await jsonpRequest(url);
-    }
+    // jsonpRequest()自体が内部でfetch(GET)を優先するようになった（scriptタグ方式は
+    // Googleアカウントのセキュリティ機能に阻まれることがあるため）ので、ここは通常の呼び出しでよい。
+    const url = `${COMPANY_SCRIPT_URL}?action=employeeLogin&id=${encodeURIComponent(id)}&password=${encodeURIComponent(password)}`;
+    const data = await jsonpRequest(url);
     if(data.error){
       status.textContent = `${data.error}（他の端末やタブですでにログインしていませんか？IDとパスワードを再度ご確認ください）`;
       return;
@@ -6515,13 +6509,6 @@ function doGet(e) {
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 
-// パスワードなどをURLに載せたくない呼び出し（ログイン等）のためのPOST口。
-// application/x-www-form-urlencodedで送られたPOSTボディはe.parameterにGETと同じ形で入るため、
-// doGetにそのまま委譲できる。
-function doPost(e) {
-  return doGet(e);
-}
-
 // この関数は「トリガー」（時間主導型・毎日実行）として管理者が1回だけ設定してください。
 // Apps Scriptエディタ左側の時計アイコン→「トリガーを追加」→実行する関数：checkDeletionSchedule→
 // イベントの種類：時間主導型→日付ベースのタイマー→午前2時〜3時など、好きな時間帯を選んでください。
@@ -7615,8 +7602,18 @@ function base64ToArrayBuffer(base64){
   return bytes.buffer;
 }
 
+// GASのWebアプリはscriptタグ(JSONP)で読み込むと、閲覧者がGoogleアカウントにサインインしている場合に
+// Google側のセキュリティ機能でブロックされることがある（フィッシング対策等の一環と推測される）。
+// 一方、通常のfetch(GET)は同じ状況でも問題なく通ることを確認済みなので、まずfetchを試し、
+// 何らかの理由でfetch自体が使えない環境（ごく古いブラウザ等）の場合だけ、従来のJSONP方式に
+// フォールバックする。
+function fetchWithTimeout(url, ms){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), ms);
+  return fetch(url, { cache:'no-store', signal: controller.signal }).finally(()=>clearTimeout(timer));
+}
 let jsonpCounter = 0;
-function jsonpRequest(url){
+function jsonpViaScriptTag(url){
   return new Promise((resolve, reject)=>{
     const cbName = 'jsonp_cb_' + (jsonpCounter++) + '_' + Date.now();
     const script = document.createElement('script');
@@ -7629,15 +7626,18 @@ function jsonpRequest(url){
     document.head.appendChild(script);
   });
 }
-
-// パスワードなど機微な値をURLに載せたくない場合はこちらを使う。
-// GAS側はform-urlencodedのPOSTをdoGetと同じくe.parameterで受け取れるようにしてある
-// （doPostがdoGetに委譲する実装）。callbackを付けないので、応答は素のJSONで返る。
-async function postRequest(url, params){
-  const body = new URLSearchParams(params);
-  const res = await fetch(url, { method: 'POST', body });
-  if(!res.ok) throw new Error('HTTP ' + res.status);
-  return await res.json();
+async function jsonpRequest(url){
+  try{
+    const res = await fetchWithTimeout(url, 45000);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }catch(err){
+    if(err.name === 'AbortError'){
+      throw new Error('タイムアウトしました（Googleサーバーが混み合っている可能性があります。時間をおいて再度お試しください）');
+    }
+    // 通常のfetchが失敗した場合のみ、念のため従来のJSONP方式にフォールバックする
+    return await jsonpViaScriptTag(url);
+  }
 }
 
 function pad2(n){ return String(n).padStart(2,'0'); }
