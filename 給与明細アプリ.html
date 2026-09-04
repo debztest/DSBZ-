@@ -85,6 +85,7 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .btn:disabled{opacity:.4;cursor:default;pointer-events:none;}
 .btn.outline{background:var(--surface);color:var(--text);border:1px solid var(--border);}
 .contact-cat-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.daytype-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .btn.small{width:auto;padding:8px 14px;font-size:13px;}
 .btn.ghost{background:var(--surface-2);color:var(--accent);border:1px solid var(--accent-soft);font-weight:700;}
 .card:focus-within .btn.ghost{background:var(--surface);}
@@ -1445,10 +1446,6 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 <div class="modal-overlay hidden" id="confirm-modal">
   <div class="confirm-card">
     <p class="confirm-message" id="confirm-modal-message"></p>
-    <div class="row-wrap-6 is-hidden mb-2" id="confirm-modal-daytype">
-      <button type="button" class="btn small outline daytype-btn" data-daytype="1">一日</button>
-      <button type="button" class="btn small outline daytype-btn" data-daytype="0.5">半日</button>
-    </div>
     <div class="confirm-actions">
       <button class="btn ghost" id="confirm-modal-cancel">キャンセル</button>
       <button class="btn" id="confirm-modal-ok">OK</button>
@@ -1639,39 +1636,17 @@ function clearButtonLoading(btn){
   delete btn.dataset.loading;
   btn.disabled = false;
 }
-// 半日/一日のような追加選択が必要な確認だけ、opts.daytypeを立てて呼ぶ。
-// 選ばれた日数は戻り値の真偽値とは別に、この変数から呼び出し側が読み取る
-// （既存の「true/falseで返る」呼び出し元を一切変えずに済むように、あえて戻り値の形は変えていない）。
-let confirmModalDayType = 1;
-function showConfirmModal(message, opts){
+function showConfirmModal(message){
   return new Promise(resolve=>{
     const overlay = document.getElementById('confirm-modal');
     const msgEl = document.getElementById('confirm-modal-message');
     const okBtn = document.getElementById('confirm-modal-ok');
     const cancelBtn = document.getElementById('confirm-modal-cancel');
-    const daytypeWrap = document.getElementById('confirm-modal-daytype');
-    const daytypeBtns = daytypeWrap.querySelectorAll('.daytype-btn');
     msgEl.textContent = message;
     cancelBtn.classList.remove('is-hidden');
-    function onDaytypeClick(ev){
-      daytypeBtns.forEach(b=>b.classList.remove('active'));
-      ev.currentTarget.classList.add('active');
-      confirmModalDayType = parseFloat(ev.currentTarget.dataset.daytype);
-    }
-    if(opts && opts.daytype){
-      confirmModalDayType = opts.initialDays !== undefined ? opts.initialDays : 1;
-      daytypeBtns.forEach(b=>{
-        b.classList.toggle('active', parseFloat(b.dataset.daytype) === confirmModalDayType);
-        b.addEventListener('click', onDaytypeClick);
-      });
-      daytypeWrap.classList.remove('is-hidden');
-    }else{
-      daytypeWrap.classList.add('is-hidden');
-    }
     overlay.classList.remove('hidden');
     function cleanup(result){
       overlay.classList.add('hidden');
-      daytypeBtns.forEach(b=>b.removeEventListener('click', onDaytypeClick));
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
       resolve(result);
@@ -1789,7 +1764,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.7';
+const APP_VERSION_HTML = '2026.09.04.8';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -8254,16 +8229,12 @@ async function applyLeave(){
   const noteInput = document.getElementById('yukyu-input-note').value.trim();
   const note = noteInput || '私用のため';
   const dateStr = dateInput;
-  if(!(await showConfirmModal(`${isoToDisplay(dateStr)}を有給として使用申請しますか？\n理由：${note}`, {daytype:true, initialDays: days}))) return;
-  const finalDays = confirmModalDayType;
-  if(finalDays > totalLeaveBalance() + 0.0001){
-    await showAlertModal('有給残日数が足りません。');
-    return;
-  }
-  const consumedFrom = deductLeave(finalDays);
+  const daysLabel = days === 0.5 ? '半日' : '1日';
+  if(!(await showConfirmModal(`${isoToDisplay(dateStr)}を有給として${daysLabel}、使用申請しますか？\n理由：${note}`))) return;
+  const consumedFrom = deductLeave(days);
   const isPendingUse = !currentIsAdmin;
   const requestId = isPendingUse ? genRequestId() : null;
-  const entry = {date: dateStr, delta: -finalDays, note: isPendingUse ? makePendingNote(note, 'PENDING_USE', requestId) : note, consumedFrom};
+  const entry = {date: dateStr, delta: -days, note: isPendingUse ? makePendingNote(note, 'PENDING_USE', requestId) : note, consumedFrom};
   leave.log.push(entry);
   ensureRecentYearKeys();
   saveJSON('leave', leave);
@@ -8281,11 +8252,11 @@ async function applyLeave(){
       if(!ok) await showAlertModal('Driveへの保存に失敗しました。設定タブの同期状況を確認してください（記録自体はこの端末には残っています）。');
     }
     if(isPendingUse){
-      logEvent('leave_use_request', `${finalDays}日 ${note}`);
-      await notifyLeaveRequest('use', requestId, dateStr, -finalDays, note);
+      logEvent('leave_use_request', `${days}日 ${note}`);
+      await notifyLeaveRequest('use', requestId, dateStr, -days, note);
       await showAlertModal('申請しました。管理者の承認をお待ちください。');
     }else{
-      logEvent('leave_use', `${finalDays}日 ${note}`);
+      logEvent('leave_use', `${days}日 ${note}`);
       await showAlertModal('使用を記録しました。');
     }
   }finally{
