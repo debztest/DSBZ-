@@ -62,9 +62,9 @@ main[data-font-scale="large"]{zoom:1.15;}
 .view{display:none;}
 .view.active{display:block;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;transition:background .15s ease,border-color .15s ease;}
-/* 保守タブは項目数が多く見分けにくいため、枠を太く・左に色帯を付けて1項目ずつ目立たせる（全項目で統一の見た目） */
-#view-maintenance .card{border-width:2px;border-left-width:6px;border-left-color:var(--accent);}
-#view-maintenance .section-title{font-size:17px;color:var(--accent);}
+/* 保守タブ・設定タブは項目数が多く見分けにくいため、枠を太く・左に色帯を付けて1項目ずつ目立たせる（全項目で統一の見た目） */
+#view-maintenance .card,#view-settings .card{border-width:2px;border-left-width:6px;border-left-color:var(--accent);}
+#view-maintenance .section-title,#view-settings .section-title{font-size:17px;color:var(--accent);}
 .card.searching{background:#E3F4FB;border-color:#9BD8EF;}
 .card.admin-closed-hint{background:#E5F6EA;border-color:#A9DDB9;}
 .card:not(.no-focus-highlight):focus-within{background:#E3F4FB;border-color:#9BD8EF;}
@@ -1038,12 +1038,12 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
   <!-- 設定タブ -->
   <section class="view" id="view-settings">
     <div class="card is-hidden" id="card-install-app">
-      <div class="section-title">アプリとしてインストール</div>
+      <div class="section-title">📱 アプリとしてインストール</div>
       <p class="muted mt-0">ホーム画面に追加すると、アプリのようにすぐ開けるようになります。</p>
       <button class="btn mt-6 w-full" id="btn-install-app">アプリをインストール</button>
     </div>
     <div class="card is-hidden" id="card-ios-install-guide">
-      <div class="section-title">アプリとしてインストール</div>
+      <div class="section-title">📱 アプリとしてインストール</div>
       <p class="muted mt-0">iPhone・iPadでは、Safariの共有メニューからホーム画面に追加できます。</p>
       <ol class="fs-13" style="padding-left:20px;margin:8px 0 0;color:var(--text);">
         <li>画面下（または上）の共有アイコン<span class="mono">□↑</span>をタップ</li>
@@ -1053,7 +1053,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <p class="muted mt-8">※ Safari以外のアプリ（Chromeなど）で開いている場合は、一度Safariで開き直してください。</p>
     </div>
     <div class="card">
-      <div class="section-title">アカウント</div>
+      <div class="section-title">🔑 アカウント</div>
       <label class="field mt-0">パスワードの変更</label>
       <div class="pos-relative">
         <input class="input-icon-pad" type="password" id="set-new-password" autocomplete="new-password" placeholder="新しいパスワード">
@@ -1068,13 +1068,13 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card">
       <div class="row mb-2">
-        <div class="section-title mb-0">お知らせ履歴</div>
+        <div class="section-title mb-0">🔔 お知らせ履歴</div>
         <button class="link-btn" id="btn-news-show-all" style="display:none;width:auto;flex-shrink:0;padding:0;">すべて見る</button>
       </div>
       <div id="news-log-list"><div class="empty">お知らせはまだありません。</div></div>
     </div>
     <div class="card" id="card-drive-sync" style="display:none;">
-      <div class="section-title">Google Drive連携</div>
+      <div class="section-title">☁️ Google Drive連携</div>
       <label class="field mt-0">現在のフォルダID（ログインすると自動設定されます）</label>
       <input type="text" id="set-drive-folder" placeholder="1kHB__0s1hetSuXEQWVqtyllw7P6BVRdJ">
       <div class="helptext">基本給・給料日・有給日数などの設定は「給与明細設定値」というGoogleドキュメントに自動で保存・同期されます。「設定を保存」を押すたび、また有給を記録するたびに自動で同期されます。</div>
@@ -1086,7 +1086,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <input type="text" id="set-script-url" readonly>
     </div>
     <div class="card">
-      <div class="section-title">給与の基礎情報</div>
+      <div class="section-title">💰 給与の基礎情報</div>
       <label class="field">基本給（月額・円）</label>
       <input type="number" id="set-base-salary" placeholder="300000">
       <label class="field">所定労働時間（月・時間）</label>
@@ -1101,7 +1101,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     <p class="muted fs-11" id="settings-admin-label" style="display:none;text-align:center;">ここから下は管理者のみに表示される設定です</p>
     <div class="card admin-closed-hint" id="card-admin-system" style="display:none;">
       <div class="row mb-2">
-        <div class="section-title mb-0">システム設定（管理者用）</div>
+        <div class="section-title mb-0">⚙️ システム設定（管理者用）</div>
         <button class="btn ghost small collapsible-toggle">開く</button>
       </div>
       <div class="collapsible-body is-hidden">
@@ -1148,7 +1148,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     </div>
     <div class="card admin-closed-hint" id="card-pay-rules">
       <div class="row mb-2">
-        <div class="section-title mb-0">支払い・有給ルール（全社共通・管理者が変更可）</div>
+        <div class="section-title mb-0">📅 支払い・有給ルール（全社共通・管理者が変更可）</div>
         <button class="btn ghost small collapsible-toggle">開く</button>
       </div>
       <div class="collapsible-body is-hidden">
@@ -1784,7 +1784,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.14';
+const APP_VERSION_HTML = '2026.09.04.15';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
