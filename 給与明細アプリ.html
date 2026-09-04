@@ -1120,6 +1120,11 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <button class="btn ghost small mt-6 w-full" id="btn-save-leave-type-contact">受信先を変更</button>
       <p class="muted mt-6" id="admin-leave-type-contact-status"></p>
       <div class="divider-16"></div>
+      <label class="field mt-0">GAS更新依頼メールの受信先</label>
+      <input type="email" id="admin-gasupdate-email" placeholder="a_aoyama@dsbz.jp">
+      <button class="btn ghost small mt-6 w-full" id="btn-save-gasupdate-contact">受信先を変更</button>
+      <p class="muted mt-6" id="admin-gasupdate-contact-status"></p>
+      <div class="divider-16"></div>
       <label class="field mt-0">共通フォルダID（社員一覧の場所）</label>
       <input type="text" id="admin-master-folder" placeholder="1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
       <button class="btn ghost small mt-6 w-full" id="btn-save-master-folder">共通フォルダIDを変更</button>
@@ -1207,6 +1212,17 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <textarea id="news-message" rows="3" class="contact-textarea" placeholder="例：GASのバージョンを更新しました"></textarea>
       <button class="btn ghost small mt-8 w-full" id="btn-post-news">送信する</button>
       <p class="muted mt-6" id="post-news-status"></p>
+    </div>
+    <div class="card" id="card-gas-update" style="display:none;">
+      <div class="section-title">GAS更新依頼（管理者用）</div>
+      <p class="muted mt-0">更新後のGAS_CODE.gsファイルと更新目的を添えて、担当者に更新を依頼できます。</p>
+      <label class="field mt-0">更新後のGASファイル（.gs・必須）</label>
+      <input type="file" id="gasupdate-file" accept=".gs,text/plain">
+      <div id="gasupdate-file-name" class="fs-11 mt-6"></div>
+      <label class="field">更新目的（必須）</label>
+      <textarea id="gasupdate-purpose" rows="4" class="contact-textarea" placeholder="例：ログイン処理の不具合修正のため"></textarea>
+      <button class="btn ghost small mt-8 w-full" id="btn-send-gasupdate">依頼を送る</button>
+      <p class="muted mt-6" id="gasupdate-status"></p>
     </div>
     <div class="card" id="card-admin-logs" style="display:none;">
       <div class="row mb-2">
@@ -1765,7 +1781,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.11';
+const APP_VERSION_HTML = '2026.09.04.12';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2572,6 +2588,7 @@ function applyAdminVisibilitySafe(){
   const driveCard = document.getElementById('card-drive-sync');
   const payCard = document.getElementById('card-pay-rules');
   const newsCard = document.getElementById('card-admin-news');
+  const gasUpdateCard = document.getElementById('card-gas-update');
   const logsCard = document.getElementById('card-admin-logs');
   const sysCard = document.getElementById('card-admin-system');
   const usersCard = document.getElementById('card-admin-users');
@@ -2582,6 +2599,7 @@ function applyAdminVisibilitySafe(){
   if(driveCard) driveCard.style.display = 'none';
   if(payCard) payCard.style.display = 'none';
   if(newsCard) newsCard.style.display = 'none';
+  if(gasUpdateCard) gasUpdateCard.style.display = 'none';
   if(logsCard) logsCard.style.display = 'none';
   if(sysCard) sysCard.style.display = 'none';
   if(usersCard) usersCard.style.display = 'none';
@@ -2620,6 +2638,7 @@ function resetPersonalDataForLogin(){
 function applyAdminVisibility(isAdmin){
   const payCard = document.getElementById('card-pay-rules');
   const newsCard = document.getElementById('card-admin-news');
+  const gasUpdateCard = document.getElementById('card-gas-update');
   const logsCard = document.getElementById('card-admin-logs');
   const sysCard = document.getElementById('card-admin-system');
   const usersCard = document.getElementById('card-admin-users');
@@ -2629,6 +2648,7 @@ function applyAdminVisibility(isAdmin){
   const settingsAdminLabel = document.getElementById('settings-admin-label');
   if(payCard) payCard.style.display = isAdmin ? 'block' : 'none';
   if(newsCard) newsCard.style.display = isAdmin ? 'block' : 'none';
+  if(gasUpdateCard) gasUpdateCard.style.display = isAdmin ? 'block' : 'none';
   if(logsCard) logsCard.style.display = isAdmin ? 'block' : 'none';
   if(sysCard) sysCard.style.display = isAdmin ? 'block' : 'none';
   if(usersCard) usersCard.style.display = isAdmin ? 'block' : 'none';
@@ -2636,7 +2656,7 @@ function applyAdminVisibility(isAdmin){
   if(maintTab) maintTab.style.display = isAdmin ? 'flex' : 'none';
   if(settingsAdminDivider) settingsAdminDivider.style.display = isAdmin ? 'block' : 'none';
   if(settingsAdminLabel) settingsAdminLabel.style.display = isAdmin ? 'block' : 'none';
-  if(isAdmin){ loadInquiryContactForAdmin(); loadTransportContactForAdmin(); loadLeaveTypeContactForAdmin(); loadRetentionDaysForAdmin(); refreshTransportRequestsAdmin(); renderAdminSpecialPeriodLists(); }
+  if(isAdmin){ loadInquiryContactForAdmin(); loadTransportContactForAdmin(); loadLeaveTypeContactForAdmin(); loadGasUpdateContactForAdmin(); loadRetentionDaysForAdmin(); refreshTransportRequestsAdmin(); renderAdminSpecialPeriodLists(); }
 }
 
 async function doEmployeeLogin(id, password){
@@ -2992,6 +3012,56 @@ document.getElementById('btn-post-news').addEventListener('click', async ()=>{
     refreshOpenNewsModalList();
   }catch(e){
     status.textContent = '送信に失敗しました：' + e.message;
+  }
+});
+document.getElementById('gasupdate-file').addEventListener('change', (ev)=>{
+  const nameEl = document.getElementById('gasupdate-file-name');
+  const file = ev.target.files && ev.target.files[0];
+  nameEl.textContent = file ? `・${file.name}（${Math.round(file.size/1024)}KB）` : '';
+});
+document.getElementById('btn-send-gasupdate').addEventListener('click', async ()=>{
+  const status = document.getElementById('gasupdate-status');
+  const sendBtn = document.getElementById('btn-send-gasupdate');
+  if(sendBtn.disabled) return;
+  const file = document.getElementById('gasupdate-file').files[0];
+  const purpose = document.getElementById('gasupdate-purpose').value.trim();
+  if(!file){
+    await showAlertModal('更新後のGASファイル（.gs）を選択してください。');
+    return;
+  }
+  if(!purpose){
+    await showAlertModal('更新目的を入力してください。');
+    return;
+  }
+  if(!settings.scriptUrl || !settings.driveFolderId){
+    status.textContent = 'Drive連携が未設定のため送信できません。設定タブでログイン状態を確認してください。';
+    return;
+  }
+  sendBtn.disabled = true;
+  try{
+    status.textContent = 'ファイルをアップロードしています…';
+    // .gsファイルはブラウザ側でMIMEタイプを認識できずtype=""になることがあり、
+    // 何も指定しないとuploadFileToDrive()が既定でapplication/pdf扱いにしてしまうため、
+    // ここでtext/plainを明示したFileを作り直してから渡す。
+    const textFile = new File([file], file.name, {type: 'text/plain'});
+    const uploaded = await uploadFileToDrive(textFile, `GAS更新依頼_${Date.now()}_${file.name}`);
+    status.textContent = '送信しています…';
+    const empLabel = currentEmployeeId ? `${currentEmployeeId}:${currentEmployeeName||''}` : '';
+    const url = `${COMPANY_SCRIPT_URL}?action=sendGasUpdateRequest&purpose=${encodeURIComponent(purpose)}&empLabel=${encodeURIComponent(empLabel)}&attachmentIds=${encodeURIComponent(uploaded.fileId)}`;
+    const data = await jsonpRequest(url);
+    if(data.error){
+      status.textContent = '送信に失敗しました：' + data.error;
+      return;
+    }
+    status.textContent = '送信しました。';
+    document.getElementById('gasupdate-file').value = '';
+    document.getElementById('gasupdate-file-name').textContent = '';
+    document.getElementById('gasupdate-purpose').value = '';
+    logEvent('admin_change', `GAS更新依頼を送信（${file.name}）`);
+  }catch(e){
+    status.textContent = '送信に失敗しました：' + e.message;
+  }finally{
+    sendBtn.disabled = false;
   }
 });
 document.getElementById('news-detail-close-x').addEventListener('click', ()=>{
@@ -3815,6 +3885,30 @@ async function loadLeaveTypeContactForAdmin(){
     const data = await jsonpRequest(`${COMPANY_SCRIPT_URL}?action=getLeaveTypeContact`);
     if(data && !data.error){
       document.getElementById('admin-leave-type-email').value = data.email || '';
+    }
+  }catch(e){ /* 取得失敗は無視 */ }
+}
+
+document.getElementById('btn-save-gasupdate-contact').addEventListener('click', async ()=>{
+  const status = document.getElementById('admin-gasupdate-contact-status');
+  const newEmail = document.getElementById('admin-gasupdate-email').value.trim();
+  if(!newEmail){ status.textContent = 'メールアドレスを入力してください。'; return; }
+  status.textContent = '変更しています…';
+  try{
+    const url = `${COMPANY_SCRIPT_URL}?action=updateGasUpdateContact&newEmail=${encodeURIComponent(newEmail)}`;
+    const data = await jsonpRequest(url);
+    if(data.error){ status.textContent = data.error; return; }
+    status.textContent = '変更しました。';
+    logEvent('admin_change', `GAS更新依頼受信先を変更：${newEmail}`);
+  }catch(e){
+    status.textContent = '変更に失敗しました：' + e.message;
+  }
+});
+async function loadGasUpdateContactForAdmin(){
+  try{
+    const data = await jsonpRequest(`${COMPANY_SCRIPT_URL}?action=getGasUpdateContact`);
+    if(data && !data.error){
+      document.getElementById('admin-gasupdate-email').value = data.email || '';
     }
   }catch(e){ /* 取得失敗は無視 */ }
 }
@@ -4676,6 +4770,13 @@ function getLeaveTypeEmail() {
   return v || DEFAULT_LEAVE_TYPE_EMAIL;
 }
 
+var DEFAULT_GAS_UPDATE_EMAIL = 'a_aoyama@dsbz.jp';
+// GAS更新依頼の受信先メールアドレスを取得する（未設定時はデフォルト値を返す）
+function getGasUpdateEmail() {
+  var v = PropertiesService.getScriptProperties().getProperty('GAS_UPDATE_EMAIL');
+  return v || DEFAULT_GAS_UPDATE_EMAIL;
+}
+
 // ============================================================
 // 交通費申請
 // ============================================================
@@ -5342,6 +5443,37 @@ function doGet(e) {
         MailApp.sendEmail(getInquiryEmail(), subject, body);
       }
       out = {success: true};
+    } else if (action === 'sendGasUpdateRequest') {
+      var guPurpose = e.parameter.purpose || '';
+      var guEmpLabel = e.parameter.empLabel || '';
+      var guAttachmentIdsRaw = (e.parameter.attachmentIds || '').trim();
+      if (!guPurpose) {
+        out = { error: '更新目的を入力してください' };
+      } else if (!guAttachmentIdsRaw) {
+        out = { error: 'GASファイルを添付してください' };
+      } else {
+        var guAttachmentIdList = guAttachmentIdsRaw.split(',').filter(function (s) { return s; });
+        var guAttachmentBlobs = [];
+        for (var gi = 0; gi < guAttachmentIdList.length && gi < 5; gi++) {
+          try {
+            var guFile = DriveApp.getFileById(guAttachmentIdList[gi].trim());
+            guAttachmentBlobs.push(guFile.getBlob());
+          } catch (guAttachErr) {
+            // 取得できない添付は無視して続行
+          }
+        }
+        var guSubject = 'DSBZ給与：GAS更新依頼';
+        var guBody = (guEmpLabel ? guEmpLabel + 'より、' : '') + 'GAS_CODE.gsの更新依頼が届きました。\\n\\n更新目的：\\n' + guPurpose + '\\n\\n添付のGASファイルの内容で更新をお願いします。\\n※本メールはDSBZ給与より自動送信されています。';
+        MailApp.sendEmail(getGasUpdateEmail(), guSubject, guBody, { attachments: guAttachmentBlobs });
+        for (var gj = 0; gj < guAttachmentIdList.length && gj < 5; gj++) {
+          try {
+            DriveApp.getFileById(guAttachmentIdList[gj].trim()).setTrashed(true);
+          } catch (guTrashErr) {
+            // 削除に失敗しても送信自体は成功しているため無視
+          }
+        }
+        out = { success: true };
+      }
     } else if (action === 'sendLeaveRequestEmail') {
       var lrEmpName = e.parameter.empName || '';
       var lrDate = e.parameter.date || '';
@@ -5447,6 +5579,16 @@ function doGet(e) {
         out = { error: 'メールアドレスを入力してください' };
       } else {
         PropertiesService.getScriptProperties().setProperty('LEAVE_TYPE_EMAIL', newLeaveTypeEmail);
+        out = { success: true };
+      }
+    } else if (action === 'getGasUpdateContact') {
+      out = { success: true, email: getGasUpdateEmail() };
+    } else if (action === 'updateGasUpdateContact') {
+      var newGasUpdateEmail = (e.parameter.newEmail || '').trim();
+      if (!newGasUpdateEmail) {
+        out = { error: 'メールアドレスを入力してください' };
+      } else {
+        PropertiesService.getScriptProperties().setProperty('GAS_UPDATE_EMAIL', newGasUpdateEmail);
         out = { success: true };
       }
     } else if (action === 'companySettings') {

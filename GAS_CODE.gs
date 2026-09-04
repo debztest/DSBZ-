@@ -94,6 +94,13 @@ function getLeaveTypeEmail() {
   return v || DEFAULT_LEAVE_TYPE_EMAIL;
 }
 
+var DEFAULT_GAS_UPDATE_EMAIL = 'a_aoyama@dsbz.jp';
+// GAS更新依頼の受信先メールアドレスを取得する（未設定時はデフォルト値を返す）
+function getGasUpdateEmail() {
+  var v = PropertiesService.getScriptProperties().getProperty('GAS_UPDATE_EMAIL');
+  return v || DEFAULT_GAS_UPDATE_EMAIL;
+}
+
 // ============================================================
 // 交通費申請
 // ============================================================
@@ -760,6 +767,37 @@ function doGet(e) {
         MailApp.sendEmail(getInquiryEmail(), subject, body);
       }
       out = {success: true};
+    } else if (action === 'sendGasUpdateRequest') {
+      var guPurpose = e.parameter.purpose || '';
+      var guEmpLabel = e.parameter.empLabel || '';
+      var guAttachmentIdsRaw = (e.parameter.attachmentIds || '').trim();
+      if (!guPurpose) {
+        out = { error: '更新目的を入力してください' };
+      } else if (!guAttachmentIdsRaw) {
+        out = { error: 'GASファイルを添付してください' };
+      } else {
+        var guAttachmentIdList = guAttachmentIdsRaw.split(',').filter(function (s) { return s; });
+        var guAttachmentBlobs = [];
+        for (var gi = 0; gi < guAttachmentIdList.length && gi < 5; gi++) {
+          try {
+            var guFile = DriveApp.getFileById(guAttachmentIdList[gi].trim());
+            guAttachmentBlobs.push(guFile.getBlob());
+          } catch (guAttachErr) {
+            // 取得できない添付は無視して続行
+          }
+        }
+        var guSubject = 'DSBZ給与：GAS更新依頼';
+        var guBody = (guEmpLabel ? guEmpLabel + 'より、' : '') + 'GAS_CODE.gsの更新依頼が届きました。\n\n更新目的：\n' + guPurpose + '\n\n添付のGASファイルの内容で更新をお願いします。\n※本メールはDSBZ給与より自動送信されています。';
+        MailApp.sendEmail(getGasUpdateEmail(), guSubject, guBody, { attachments: guAttachmentBlobs });
+        for (var gj = 0; gj < guAttachmentIdList.length && gj < 5; gj++) {
+          try {
+            DriveApp.getFileById(guAttachmentIdList[gj].trim()).setTrashed(true);
+          } catch (guTrashErr) {
+            // 削除に失敗しても送信自体は成功しているため無視
+          }
+        }
+        out = { success: true };
+      }
     } else if (action === 'sendLeaveRequestEmail') {
       var lrEmpName = e.parameter.empName || '';
       var lrDate = e.parameter.date || '';
@@ -865,6 +903,16 @@ function doGet(e) {
         out = { error: 'メールアドレスを入力してください' };
       } else {
         PropertiesService.getScriptProperties().setProperty('LEAVE_TYPE_EMAIL', newLeaveTypeEmail);
+        out = { success: true };
+      }
+    } else if (action === 'getGasUpdateContact') {
+      out = { success: true, email: getGasUpdateEmail() };
+    } else if (action === 'updateGasUpdateContact') {
+      var newGasUpdateEmail = (e.parameter.newEmail || '').trim();
+      if (!newGasUpdateEmail) {
+        out = { error: 'メールアドレスを入力してください' };
+      } else {
+        PropertiesService.getScriptProperties().setProperty('GAS_UPDATE_EMAIL', newGasUpdateEmail);
         out = { success: true };
       }
     } else if (action === 'companySettings') {
