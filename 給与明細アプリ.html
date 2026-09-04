@@ -157,6 +157,7 @@ nav.tabbar button svg{width:20px;height:20px;}
 .modal-sheet .frame{background:#2b2c2a;}
 .modal-sheet iframe{width:100%;height:60vh;border:none;display:block;}
 .x-btn{background:var(--danger);border:none;font-size:18px;color:#fff;line-height:1;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.dl-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;}
 .modal-icon-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;}
 .modal-icon-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
 .modal-sheet header.news-modal-bulk-mode{background:#DCF5C4;}
@@ -1564,7 +1565,12 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
 <div class="modal-overlay hidden" id="modal">
   <div class="modal-sheet">
     <header>
-      <h3 id="modal-title">明細</h3>
+      <div class="row-noshrink-8" style="align-items:center;">
+        <button class="modal-icon-btn" id="modal-download-btn" title="ダウンロード">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+        </button>
+        <h3 id="modal-title">明細</h3>
+      </div>
       <div class="row-noshrink-8">
         <button class="modal-icon-btn" id="modal-rotate-btn" title="90度回転">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -1752,7 +1758,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.04.2';
+const APP_VERSION_HTML = '2026.09.04.3';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -7086,6 +7092,34 @@ async function openFile(doc, label, payKey){
     viewer.innerHTML = `<p style="color:#f5c2c0;text-align:center;margin-top:40px;padding:0 16px;">表示に失敗しました：${e.message}</p>`;
   }
 }
+function mimeToExt(mime){
+  if(!mime) return 'pdf';
+  if(mime.includes('pdf')) return 'pdf';
+  if(mime.includes('jpeg')) return 'jpg';
+  if(mime.includes('png')) return 'png';
+  const parts = mime.split('/');
+  return parts[1] || 'pdf';
+}
+async function downloadFile(doc, label){
+  try{
+    if(!doc._bytes){ doc._bytes = await fetchFileBytes(doc); }
+    const mime = doc._mimeType || 'application/pdf';
+    const blob = new Blob([doc._bytes.slice(0)], {type: mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(label || doc.name || '明細').replace(/[\\/:*?"<>|]/g,'')}.${mimeToExt(mime)}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }catch(e){
+    await showAlertModal('ダウンロードに失敗しました：' + e.message);
+  }
+}
+document.getElementById('modal-download-btn').addEventListener('click', ()=>{
+  if(currentOcrFile) downloadFile(currentOcrFile, document.getElementById('modal-title').textContent);
+});
 document.getElementById('modal-close').addEventListener('click', ()=>{
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal-viewer').innerHTML = '';
@@ -7302,10 +7336,14 @@ function renderLedgerRow(container, doc, ym, labelOverride, payKey){
       </div>
       ${unregTag}
       <span class="tag ok">閲覧</span>
+      <button class="dl-btn" type="button" data-download title="ダウンロード">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+      </button>
       ${delBtn}
     `;
     row.querySelector('.info').addEventListener('click', ()=>openFile(doc, label, ymKey));
     row.querySelector('.tag').addEventListener('click', ()=>openFile(doc, label, ymKey));
+    row.querySelector('[data-download]').addEventListener('click', (ev)=>{ ev.stopPropagation(); downloadFile(doc, label); });
     const delEl = row.querySelector('[data-del]');
     if(delEl) delEl.addEventListener('click', (ev)=>{ ev.stopPropagation(); deleteDocument(doc.id); });
   }else{
