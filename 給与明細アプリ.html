@@ -82,7 +82,7 @@ textarea.contact-textarea{width:100%;padding:10px 11px;border:1px solid var(--bo
 input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;}
 .mono{font-family:'JetBrains Mono',monospace;}
 button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
-.btn{border:none;background:var(--accent);color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;font-weight:500;width:100%;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease;}
+.btn{border:none;background:var(--accent);color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;font-weight:500;width:100%;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease,background-color .25s ease,color .25s ease,border-color .25s ease;}
 .btn:hover{filter:brightness(1.08);box-shadow:0 3px 10px rgba(91,58,148,0.28);}
 .btn:active{transform:scale(.98);}
 .btn:disabled{opacity:.4;cursor:default;pointer-events:none;}
@@ -1789,7 +1789,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.09.02';
+const APP_VERSION_HTML = '2026.09.09.03';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
