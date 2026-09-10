@@ -1790,7 +1790,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.10.02';
+const APP_VERSION_HTML = '2026.09.10.03';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2673,7 +2673,10 @@ function applyAdminVisibility(isAdmin){
 async function doEmployeeLogin(id, password){
   const status = document.getElementById('login-status');
   status.textContent = 'ログインしています…';
-  await bootstrapScriptUrl();
+  // 起動時に一度だけ済ませるブートストラップ通信（GASのURL確認）が万一まだ終わっていなくても、
+  // ここで待ってログイン自体を遅らせる必要はない（待たずに進めても、後段のjsonpRequestは
+  // その時点のCOMPANY_SCRIPT_URLをそのまま使うだけで問題ない）。裏側で進行させるだけにする。
+  bootstrapScriptUrl();
   try{
     // jsonpRequest()自体が内部でfetch(GET)を優先するようになった（scriptタグ方式は
     // Googleアカウントのセキュリティ機能に阻まれることがあるため）ので、ここは通常の呼び出しでよい。
@@ -5137,6 +5140,19 @@ function getOrCreateRequiredDocumentsSheet(ss) {
 
 // マスターフォルダ直下の「管理情報」スプレッドシートを探す（.xlsx変換後のファイル名にも対応）
 function findMasterSpreadsheetFile() {
+  // 「管理情報」スプレッドシートはほぼ全アクションで毎回参照される（ログイン含む）ため、
+  // 毎回Driveフォルダを検索していると遅延の主因になる。一度見つけたファイルIDを
+  // スクリプトプロパティに覚えておき、2回目以降はID直接指定（高速）で開く。
+  var props = PropertiesService.getScriptProperties();
+  var cachedId = props.getProperty('MASTER_SPREADSHEET_ID');
+  if (cachedId) {
+    try {
+      var cachedFile = DriveApp.getFileById(cachedId);
+      if (cachedFile.getMimeType() === MimeType.GOOGLE_SHEETS) return cachedFile;
+    } catch (eCache) {
+      // キャッシュ先が削除・移動済みなどで開けない場合は、下の通常検索にフォールバックする
+    }
+  }
   var masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
   // Driveへ.xlsxをアップロードしてGoogleスプレッドシートへ自動変換した場合、
   // 見た目上のファイル名に拡張子が残ることがあるため、両方の名前で探す。
@@ -5145,7 +5161,10 @@ function findMasterSpreadsheetFile() {
     var it = masterFolder.getFilesByName(candidateNames[ni]);
     while (it.hasNext()) {
       var f = it.next();
-      if (f.getMimeType() === MimeType.GOOGLE_SHEETS) return f;
+      if (f.getMimeType() === MimeType.GOOGLE_SHEETS) {
+        props.setProperty('MASTER_SPREADSHEET_ID', f.getId());
+        return f;
+      }
     }
   }
   return null;

@@ -448,6 +448,19 @@ function getOrCreateRequiredDocumentsSheet(ss) {
 
 // マスターフォルダ直下の「管理情報」スプレッドシートを探す（.xlsx変換後のファイル名にも対応）
 function findMasterSpreadsheetFile() {
+  // 「管理情報」スプレッドシートはほぼ全アクションで毎回参照される（ログイン含む）ため、
+  // 毎回Driveフォルダを検索していると遅延の主因になる。一度見つけたファイルIDを
+  // スクリプトプロパティに覚えておき、2回目以降はID直接指定（高速）で開く。
+  var props = PropertiesService.getScriptProperties();
+  var cachedId = props.getProperty('MASTER_SPREADSHEET_ID');
+  if (cachedId) {
+    try {
+      var cachedFile = DriveApp.getFileById(cachedId);
+      if (cachedFile.getMimeType() === MimeType.GOOGLE_SHEETS) return cachedFile;
+    } catch (eCache) {
+      // キャッシュ先が削除・移動済みなどで開けない場合は、下の通常検索にフォールバックする
+    }
+  }
   var masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
   // Driveへ.xlsxをアップロードしてGoogleスプレッドシートへ自動変換した場合、
   // 見た目上のファイル名に拡張子が残ることがあるため、両方の名前で探す。
@@ -456,7 +469,10 @@ function findMasterSpreadsheetFile() {
     var it = masterFolder.getFilesByName(candidateNames[ni]);
     while (it.hasNext()) {
       var f = it.next();
-      if (f.getMimeType() === MimeType.GOOGLE_SHEETS) return f;
+      if (f.getMimeType() === MimeType.GOOGLE_SHEETS) {
+        props.setProperty('MASTER_SPREADSHEET_ID', f.getId());
+        return f;
+      }
     }
   }
   return null;
