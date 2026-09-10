@@ -1790,7 +1790,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.10.01';
+const APP_VERSION_HTML = '2026.09.10.02';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -1800,7 +1800,9 @@ async function bootstrapScriptUrl(){
   scriptUrlBootstrapped = true;
   if(BOOTSTRAP_DOC_ID === 'PUT_BOOTSTRAP_DOC_ID_HERE') return;
   try{
-    const res = await fetch(`https://docs.google.com/document/d/${BOOTSTRAP_DOC_ID}/export?format=txt`);
+    // ここだけタイムアウトなしのfetchだったため、Google側の応答が詰まると
+    // ログイン処理全体が無期限に固まってしまう不具合があった。他の通信同様に上限を設ける。
+    const res = await fetchWithTimeout(`https://docs.google.com/document/d/${BOOTSTRAP_DOC_ID}/export?format=txt`, 10000);
     if(res.ok){
       const text = (await res.text()).trim();
       if(text.startsWith('https://script.google.com/')) COMPANY_SCRIPT_URL = text;
