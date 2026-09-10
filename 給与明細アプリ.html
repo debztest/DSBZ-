@@ -220,7 +220,9 @@ nav.tabbar button svg{width:20px;height:20px;}
 .is-hidden{display:none!important;}
 .text-center{text-align:center!important;}
 /* のれんが下りるように、上から滑らかに開閉するパネル（実際の高さをJSで測ってアニメーションさせる） */
-.filter-panel{max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1);}
+.filter-panel,.reveal-panel{max-height:0;overflow:hidden;box-sizing:border-box;transition:max-height .32s cubic-bezier(.4,0,.2,1);}
+/* 閉じる動作だけ一瞬で行いたい時に、一時的にアニメーションを無効化する */
+.reveal-panel.no-anim{transition:none;}
 
 /* --- component classes (extracted from inline style attributes) --- */
 .input-icon-pad{padding-right:44px!important;}
@@ -827,7 +829,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <p class="muted" id="meisai-status">まだ明細が登録されていません。「＋ PDFを追加」からスキャン済みのPDFを選んでください。</p>
       <div id="meisai-list"></div>
       <button class="link-btn" id="btn-show-all">すべての明細を表示</button>
-      <div id="meisai-all" style="display:none;margin-top:6px;border-top:1px solid var(--border);"></div>
+      <div id="meisai-all" class="reveal-panel" style="margin-top:6px;border-top:1px solid var(--border);"></div>
     </div>
   </section>
 
@@ -1794,7 +1796,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.10.07';
+const APP_VERSION_HTML = '2026.09.10.08';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -7701,6 +7703,9 @@ function renderMeisaiDefault(){
     });
   }
 
+  // 開いた状態のまま裏で中身が更新された場合（Drive同期など）に高さがずれないよう、その場合だけ測り直す
+  if(allEl.classList.contains('is-open')) allEl.style.maxHeight = allEl.scrollHeight + 'px';
+
   const status = document.getElementById('meisai-status');
   status.textContent = allDocs.length ? `${allDocs.length}件の明細（ローカル${documents.length}件・Drive${driveDocs.length}件）` : 'まだ明細が登録されていません。「＋ PDFを追加」またはDrive連携を設定してください。';
 }
@@ -7722,8 +7727,11 @@ function renderMeisaiFilteredList(){
 
   const listEl = document.getElementById('meisai-list');
   listEl.innerHTML = '';
-  document.getElementById('meisai-all').style.display = 'none';
-  document.getElementById('meisai-all').innerHTML = '';
+  const allElF = document.getElementById('meisai-all');
+  allElF.classList.add('no-anim');
+  allElF.classList.remove('is-open');
+  allElF.style.maxHeight = '0px';
+  allElF.innerHTML = '';
   document.getElementById('btn-show-all').classList.add('is-hidden');
   document.getElementById('btn-show-all').textContent = 'すべての明細を表示';
 
@@ -7792,8 +7800,18 @@ document.getElementById('btn-meisai-filter-reset').addEventListener('click', ()=
 });
 document.getElementById('btn-show-all').addEventListener('click', ()=>{
   const el = document.getElementById('meisai-all');
-  const showing = el.style.display !== 'none';
-  el.style.display = showing ? 'none' : 'block';
+  const showing = el.classList.contains('is-open');
+  if(showing){
+    // 閉じるときはアニメーションなしで一瞬で閉じる
+    el.classList.add('no-anim');
+    el.classList.remove('is-open');
+    el.style.maxHeight = '0px';
+  }else{
+    // 開くときは、のれんが下りるように滑らかに
+    el.classList.remove('no-anim');
+    el.classList.add('is-open');
+    el.style.maxHeight = el.scrollHeight + 'px';
+  }
   document.getElementById('btn-show-all').textContent = showing ? 'すべての明細を表示' : '閉じる';
 });
 
