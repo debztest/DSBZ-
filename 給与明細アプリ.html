@@ -1278,7 +1278,10 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     <div class="card" id="card-admin-users">
       <div class="row mb-2">
         <div class="section-title mb-0">👥 ユーザー管理</div>
-        <button class="btn ghost small" id="btn-admin-reset">リセット</button>
+        <div class="row-wrap-6" style="justify-content:flex-end;">
+          <button class="btn ghost small" id="btn-admin-list-all">一覧から選択</button>
+          <button class="btn ghost small" id="btn-admin-reset">リセット</button>
+        </div>
       </div>
       <label class="field mt-0">社員ID または 苗字（ひらがな）</label>
       <input type="text" id="admin-search-id" placeholder="例：000 または やまだ">
@@ -1796,7 +1799,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.10.08';
+const APP_VERSION_HTML = '2026.09.10.09';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3715,6 +3718,26 @@ document.getElementById('btn-confirm-create-user').addEventListener('click', asy
   });
 });
 
+// 検索結果が複数件の場合、および「一覧から選択」の一覧表示の両方で使う共通の一覧描画処理
+function renderAdminUserMultiList(matches){
+  const multiEl = document.getElementById('admin-user-multi');
+  multiEl.innerHTML = matches.map(m=>
+    `<div class="log-item admin-multi-row" data-id="${m.id}" style="cursor:pointer;"><div style="${m.deleted?'color:#c0392b;':''}">${m.id}：${m.seiKana}${m.meiKana}${m.deleted?'（削除済み）':''}</div></div>`
+  ).join('');
+  multiEl.querySelectorAll('.admin-multi-row').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      const status = document.getElementById('admin-search-status');
+      status.textContent = '読み込んでいます…';
+      const url2 = `${COMPANY_SCRIPT_URL}?action=adminSearchUser&targetId=${encodeURIComponent(el.dataset.id)}`;
+      const data2 = await jsonpRequest(url2);
+      if(data2.error){ status.textContent = data2.error; return; }
+      loadUserDetailIntoForm({ id: data2.id, folderId: data2.folderId, userInfo: data2.userInfo, byYear: data2.byYear, individualGrantDate: data2.individualGrantDate, individualGrantDays: data2.individualGrantDays });
+      status.textContent = `社員ID「${data2.id}」を選択しました。`;
+    });
+  });
+  multiEl.style.display = 'block';
+  setUserSearchActive(true);
+}
 document.getElementById('btn-admin-search').addEventListener('click', async ()=>{
   const status = document.getElementById('admin-search-status');
   const query = document.getElementById('admin-search-id').value.trim();
@@ -3731,26 +3754,28 @@ document.getElementById('btn-admin-search').addEventListener('click', async ()=>
       loadUserDetailIntoForm(data.detail);
       status.textContent = `社員ID「${data.detail.id}」が見つかりました。`;
     }else{
-      const multiEl = document.getElementById('admin-user-multi');
       status.textContent = `以下${data.matches.length}名ヒットしました。`;
-      multiEl.innerHTML = data.matches.map(m=>
-        `<div class="log-item admin-multi-row" data-id="${m.id}" style="cursor:pointer;"><div style="${m.deleted?'color:#c0392b;':''}">${m.id}：${m.seiKana}${m.meiKana}${m.deleted?'（削除済み）':''}</div></div>`
-      ).join('');
-      multiEl.querySelectorAll('.admin-multi-row').forEach(el=>{
-        el.addEventListener('click', async ()=>{
-          status.textContent = '読み込んでいます…';
-          const url2 = `${COMPANY_SCRIPT_URL}?action=adminSearchUser&targetId=${encodeURIComponent(el.dataset.id)}`;
-          const data2 = await jsonpRequest(url2);
-          if(data2.error){ status.textContent = data2.error; return; }
-          loadUserDetailIntoForm({ id: data2.id, folderId: data2.folderId, userInfo: data2.userInfo, byYear: data2.byYear, individualGrantDate: data2.individualGrantDate, individualGrantDays: data2.individualGrantDays });
-          status.textContent = `社員ID「${data2.id}」を選択しました。`;
-        });
-      });
-      multiEl.style.display = 'block';
-      setUserSearchActive(true);
+      renderAdminUserMultiList(data.matches);
     }
   }catch(e){
     status.textContent = '検索に失敗しました：' + e.message;
+    setUserSearchActive(false);
+  }
+});
+document.getElementById('btn-admin-list-all').addEventListener('click', async ()=>{
+  const status = document.getElementById('admin-search-status');
+  status.textContent = '読み込んでいます…';
+  document.getElementById('admin-user-panel').style.display = 'none';
+  document.getElementById('admin-user-multi').style.display = 'none';
+  document.getElementById('admin-transport-revise-section').classList.add('is-hidden');
+  try{
+    const url = `${COMPANY_SCRIPT_URL}?action=adminListAllUsers`;
+    const data = await jsonpRequest(url);
+    if(data.error){ status.textContent = data.error; setUserSearchActive(false); return; }
+    status.textContent = `全${data.matches.length}名`;
+    renderAdminUserMultiList(data.matches);
+  }catch(e){
+    status.textContent = '読み込みに失敗しました：' + e.message;
     setUserSearchActive(false);
   }
 });
@@ -5886,6 +5911,38 @@ function doGet(e) {
             out = { success: true, mode: 'multiple', matches: matchesQ };
           }
         }
+      }
+    } else if (action === 'adminListAllUsers') {
+      // 「一覧から選択」用：検索条件なしで全社員（削除済み含む）を一覧で返す
+      var ssAll = openMasterSpreadsheet();
+      if (!ssAll) {
+        out = {error: '「管理情報」スプレッドシートが見つかりません（管理者は先に移行処理を実行してください）'};
+      } else {
+        var empDataAll = getSheetData(ssAll, '社員一覧');
+        var userDataAll = getSheetData(ssAll, 'ユーザー情報');
+        var userByIdAll = {};
+        userDataAll.rows.forEach(function (row) {
+          var rec = rowToObject(userDataAll.header, row);
+          userByIdAll[String(rec['ユーザーID'] || '').trim()] = rec;
+        });
+        var matchesAll = empDataAll.rows.map(function (row) {
+          var id = String(row[1]).trim();
+          var rec = userByIdAll[id] || {};
+          return {
+            id: id,
+            sei: rec['苗字'] || '',
+            mei: rec['名前'] || '',
+            seiKana: rec['みょうじ'] || '',
+            meiKana: rec['なまえ'] || '',
+            deleted: String(rec['削除フラグ']) === '1'
+          };
+        });
+        matchesAll.sort(function (a, b) {
+          var na = parseInt(a.id, 10), nb = parseInt(b.id, 10);
+          if (!isNaN(na) && !isNaN(nb)) return na - nb;
+          return a.id.localeCompare(b.id);
+        });
+        out = { success: true, matches: matchesAll };
       }
     } else if (action === 'adminDeleteUser') {
       var ssDel = openMasterSpreadsheet();

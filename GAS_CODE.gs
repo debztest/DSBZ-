@@ -1189,6 +1189,38 @@ function doGet(e) {
           }
         }
       }
+    } else if (action === 'adminListAllUsers') {
+      // 「一覧から選択」用：検索条件なしで全社員（削除済み含む）を一覧で返す
+      var ssAll = openMasterSpreadsheet();
+      if (!ssAll) {
+        out = {error: '「管理情報」スプレッドシートが見つかりません（管理者は先に移行処理を実行してください）'};
+      } else {
+        var empDataAll = getSheetData(ssAll, '社員一覧');
+        var userDataAll = getSheetData(ssAll, 'ユーザー情報');
+        var userByIdAll = {};
+        userDataAll.rows.forEach(function (row) {
+          var rec = rowToObject(userDataAll.header, row);
+          userByIdAll[String(rec['ユーザーID'] || '').trim()] = rec;
+        });
+        var matchesAll = empDataAll.rows.map(function (row) {
+          var id = String(row[1]).trim();
+          var rec = userByIdAll[id] || {};
+          return {
+            id: id,
+            sei: rec['苗字'] || '',
+            mei: rec['名前'] || '',
+            seiKana: rec['みょうじ'] || '',
+            meiKana: rec['なまえ'] || '',
+            deleted: String(rec['削除フラグ']) === '1'
+          };
+        });
+        matchesAll.sort(function (a, b) {
+          var na = parseInt(a.id, 10), nb = parseInt(b.id, 10);
+          if (!isNaN(na) && !isNaN(nb)) return na - nb;
+          return a.id.localeCompare(b.id);
+        });
+        out = { success: true, matches: matchesAll };
+      }
     } else if (action === 'adminDeleteUser') {
       var ssDel = openMasterSpreadsheet();
       if (!ssDel) {
