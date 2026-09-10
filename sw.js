@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kyuyodaicho-v3';
+const CACHE_NAME = 'kyuyodaicho-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
