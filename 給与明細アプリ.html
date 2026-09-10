@@ -219,10 +219,8 @@ nav.tabbar button svg{width:20px;height:20px;}
 .opacity-70{opacity:0.7!important;}
 .is-hidden{display:none!important;}
 .text-center{text-align:center!important;}
-/* のれんが下りるように、上から滑らかに開閉するパネル */
-.filter-panel{display:grid;grid-template-rows:0fr;transition:grid-template-rows .32s cubic-bezier(.4,0,.2,1);}
-.filter-panel.is-open{grid-template-rows:1fr;}
-.filter-panel .filter-panel-inner{overflow:hidden;min-height:0;box-sizing:border-box;}
+/* のれんが下りるように、上から滑らかに開閉するパネル（実際の高さをJSで測ってアニメーションさせる） */
+.filter-panel{max-height:0;overflow:hidden;transition:max-height .32s cubic-bezier(.4,0,.2,1);}
 
 /* --- component classes (extracted from inline style attributes) --- */
 .input-icon-pad{padding-right:44px!important;}
@@ -1796,7 +1794,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.10.05';
+const APP_VERSION_HTML = '2026.09.10.06';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -7761,7 +7759,15 @@ function renderMeisaiFilteredList(){
 }
 document.getElementById('btn-meisai-search-toggle').addEventListener('click', ()=>{
   const panel = document.getElementById('meisai-filter-panel');
-  const nowOpen = panel.classList.toggle('is-open');
+  const inner = panel.querySelector('.filter-panel-inner');
+  const nowOpen = !panel.classList.contains('is-open');
+  if(nowOpen){
+    panel.classList.add('is-open');
+    panel.style.maxHeight = inner.scrollHeight + 'px';
+  }else{
+    panel.classList.remove('is-open');
+    panel.style.maxHeight = '0px';
+  }
   document.getElementById('btn-meisai-search-toggle').classList.toggle('active', nowOpen);
 });
 document.querySelectorAll('[data-meisai-cat]').forEach(btn=>{
