@@ -153,6 +153,9 @@ nav.tabbar button svg{width:20px;height:20px;}
 .log-item{display:flex;justify-content:space-between;font-size:13px;padding:9px 0;border-bottom:1px solid var(--border);}
 .log-item:last-child{border-bottom:none;}
 .log-item .d{color:var(--text-3);font-size:11px;}
+.admin-multi-row{padding-left:8px;padding-right:8px;border-radius:8px;transition:background-color .2s ease,color .2s ease;}
+.admin-multi-row:hover{background:var(--accent);color:#fff;}
+.admin-multi-row:hover div{color:#fff!important;}
 .plusminus{display:flex;gap:8px;margin-top:10px;}
 .plusminus button{flex:1;}
 .modal-overlay{position:fixed;inset:0;background:rgba(23,26,23,.55);display:flex;align-items:center;justify-content:center;z-index:250;padding:0;box-sizing:border-box;overscroll-behavior:contain;}
@@ -1553,6 +1556,19 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="admin-user-list-modal">
+  <div class="modal-sheet modal-sheet-80vh">
+    <header>
+      <h3>全社員から選択</h3>
+      <button class="x-btn" id="admin-user-list-modal-close">×</button>
+    </header>
+    <div class="modal-body">
+      <p class="muted mt-0" id="admin-user-list-modal-status">読み込んでいます…</p>
+      <div id="admin-user-list-modal-body"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="pdf-rename-modal">
   <div class="modal-sheet">
     <header>
@@ -1799,7 +1815,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.10.09';
+const APP_VERSION_HTML = '2026.09.10.10';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3718,13 +3734,12 @@ document.getElementById('btn-confirm-create-user').addEventListener('click', asy
   });
 });
 
-// 検索結果が複数件の場合、および「一覧から選択」の一覧表示の両方で使う共通の一覧描画処理
-function renderAdminUserMultiList(matches){
-  const multiEl = document.getElementById('admin-user-multi');
-  multiEl.innerHTML = matches.map(m=>
+// 検索結果が複数件の場合、および「一覧から選択」モーダルの両方で使う共通の一覧行描画処理
+function renderAdminUserRows(container, matches, onSelected){
+  container.innerHTML = matches.map(m=>
     `<div class="log-item admin-multi-row" data-id="${m.id}" style="cursor:pointer;"><div style="${m.deleted?'color:#c0392b;':''}">${m.id}：${m.seiKana}${m.meiKana}${m.deleted?'（削除済み）':''}</div></div>`
   ).join('');
-  multiEl.querySelectorAll('.admin-multi-row').forEach(el=>{
+  container.querySelectorAll('.admin-multi-row').forEach(el=>{
     el.addEventListener('click', async ()=>{
       const status = document.getElementById('admin-search-status');
       status.textContent = '読み込んでいます…';
@@ -3733,8 +3748,13 @@ function renderAdminUserMultiList(matches){
       if(data2.error){ status.textContent = data2.error; return; }
       loadUserDetailIntoForm({ id: data2.id, folderId: data2.folderId, userInfo: data2.userInfo, byYear: data2.byYear, individualGrantDate: data2.individualGrantDate, individualGrantDays: data2.individualGrantDays });
       status.textContent = `社員ID「${data2.id}」を選択しました。`;
+      if(onSelected) onSelected();
     });
   });
+}
+function renderAdminUserMultiList(matches){
+  const multiEl = document.getElementById('admin-user-multi');
+  renderAdminUserRows(multiEl, matches);
   multiEl.style.display = 'block';
   setUserSearchActive(true);
 }
@@ -3763,21 +3783,24 @@ document.getElementById('btn-admin-search').addEventListener('click', async ()=>
   }
 });
 document.getElementById('btn-admin-list-all').addEventListener('click', async ()=>{
-  const status = document.getElementById('admin-search-status');
-  status.textContent = '読み込んでいます…';
-  document.getElementById('admin-user-panel').style.display = 'none';
-  document.getElementById('admin-user-multi').style.display = 'none';
-  document.getElementById('admin-transport-revise-section').classList.add('is-hidden');
+  const modal = document.getElementById('admin-user-list-modal');
+  const modalStatus = document.getElementById('admin-user-list-modal-status');
+  const modalBody = document.getElementById('admin-user-list-modal-body');
+  modalBody.innerHTML = '';
+  modalStatus.textContent = '読み込んでいます…';
+  modal.classList.remove('hidden');
   try{
     const url = `${COMPANY_SCRIPT_URL}?action=adminListAllUsers`;
     const data = await jsonpRequest(url);
-    if(data.error){ status.textContent = data.error; setUserSearchActive(false); return; }
-    status.textContent = `全${data.matches.length}名`;
-    renderAdminUserMultiList(data.matches);
+    if(data.error){ modalStatus.textContent = data.error; return; }
+    modalStatus.textContent = `全${data.matches.length}名（クリックして選択）`;
+    renderAdminUserRows(modalBody, data.matches, ()=>{ modal.classList.add('hidden'); });
   }catch(e){
-    status.textContent = '読み込みに失敗しました：' + e.message;
-    setUserSearchActive(false);
+    modalStatus.textContent = '読み込みに失敗しました：' + e.message;
   }
+});
+document.getElementById('admin-user-list-modal-close').addEventListener('click', ()=>{
+  document.getElementById('admin-user-list-modal').classList.add('hidden');
 });
 document.getElementById('admin-search-id').addEventListener('keydown', (ev)=>{
   if(ev.key === 'Enter'){ ev.preventDefault(); document.getElementById('btn-admin-search').click(); }
