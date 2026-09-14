@@ -1868,7 +1868,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.04';
+const APP_VERSION_HTML = '2026.09.14.05';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -5940,27 +5940,39 @@ function doGet(e) {
       MailApp.sendEmail(getTransportEmail(), cpSubject, cpBody);
       out = {success: true};
     } else if (action === 'uploadChunkStart') {
-      var upFolder = DriveApp.getFolderById(e.parameter.folder);
-      var tempDoc = DocumentApp.create('_upload_tmp_' + new Date().getTime());
-      var tempFile = DriveApp.getFileById(tempDoc.getId());
-      upFolder.addFile(tempFile);
-      DriveApp.getRootFolder().removeFile(tempFile);
-      out = { success: true, tempDocId: tempDoc.getId() };
+      // 以前はチャンクの一時保存先としてGoogleドキュメントを都度作成・開閉していたが、
+      // ドキュメントの開く/保存する処理は1回あたり数秒かかり、チャンク数が多いファイルだと
+      // アップロード全体で数分かかる原因になっていた。読み書きが高速なCacheServiceに
+      // 切り替えて高速化する（この段階ではDriveへのアクセスも不要になった）。
+      var tempId = Utilities.getUuid();
+      CacheService.getScriptCache().put('upload_' + tempId + '_count', '0', 21600);
+      out = { success: true, tempDocId: tempId };
     } else if (action === 'uploadChunkAppend') {
-      var appendDoc = DocumentApp.openById(e.parameter.tempDocId);
-      appendDoc.getBody().appendParagraph(e.parameter.data || '');
-      appendDoc.saveAndClose();
+      var cacheA = CacheService.getScriptCache();
+      var tempIdA = e.parameter.tempDocId;
+      var countKeyA = 'upload_' + tempIdA + '_count';
+      var countA = parseInt(cacheA.get(countKeyA) || '0', 10);
+      cacheA.put('upload_' + tempIdA + '_' + countA, e.parameter.data || '', 21600);
+      cacheA.put(countKeyA, String(countA + 1), 21600);
       out = { success: true };
     } else if (action === 'uploadChunkFinish') {
-      var finishDoc = DocumentApp.openById(e.parameter.tempDocId);
-      var fullText = finishDoc.getBody().getText().replace(/\\n/g, '').replace(/\\s/g, '');
+      var cacheF = CacheService.getScriptCache();
+      var tempIdF = e.parameter.tempDocId;
+      var countF = parseInt(cacheF.get('upload_' + tempIdF + '_count') || '0', 10);
+      var keysF = [];
+      for (var pi = 0; pi < countF; pi++) keysF.push('upload_' + tempIdF + '_' + pi);
+      var chunkMapF = cacheF.getAll(keysF); // 1件ずつgetするより、まとめて取得したほうが速い
+      var partsF = [];
+      for (var pi2 = 0; pi2 < countF; pi2++) partsF.push(chunkMapF[keysF[pi2]] || '');
+      var fullText = partsF.join('');
       var targetFolder = DriveApp.getFolderById(e.parameter.folder);
       var fileName = e.parameter.filename || 'アップロードファイル';
       var mimeType = e.parameter.mimeType || 'application/pdf';
       var bytes = Utilities.base64Decode(fullText);
       var blob = Utilities.newBlob(bytes, mimeType, fileName);
       var newFile = targetFolder.createFile(blob);
-      DriveApp.getFileById(finishDoc.getId()).setTrashed(true);
+      cacheF.removeAll(keysF);
+      cacheF.remove('upload_' + tempIdF + '_count');
       out = { success: true, fileId: newFile.getId(), fileName: newFile.getName() };
     } else if (action === 'getAppIcon') {
       var masterFolderIcon = DriveApp.getFolderById(MASTER_FOLDER_ID);
