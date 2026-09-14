@@ -1353,6 +1353,34 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <p class="muted mt-6" id="admin-delete-action-status"></p>
       </div>
     </div>
+    <div class="card" id="card-admin-payslip-upload" style="display:none;">
+      <div class="section-title">📄 給与明細の代理登録</div>
+      <p class="muted mt-0">従業員に代わって、給与明細PDFをDriveへ登録できます。ここから登録した明細は、明細一覧に削除ボタンが表示されません。</p>
+      <label class="field mt-0">①対象ユーザー</label>
+      <button class="btn ghost small w-full" id="btn-payslip-upload-select-user">ユーザーを選択</button>
+      <p class="muted mt-6" id="payslip-upload-user-status">まだ選択されていません。</p>
+      <label class="field">②給与明細の種類</label>
+      <select id="payslip-upload-company">
+        <option value="dsbz">DSBZ会社</option>
+        <option value="other">その他</option>
+      </select>
+      <select id="payslip-upload-category" class="mt-6">
+        <option value="salary">明細</option>
+        <option value="bonus">賞与</option>
+      </select>
+      <label class="field">③対象年月日</label>
+      <div class="row" style="gap:8px;">
+        <input type="number" id="payslip-upload-year" placeholder="年（例：2026）" style="flex:1;">
+        <input type="number" id="payslip-upload-month" min="1" max="12" placeholder="月" style="flex:1;">
+      </div>
+      <input type="number" id="payslip-upload-day" min="1" max="31" placeholder="日（不明な場合は空欄でOK）" class="mt-6">
+      <label class="field">④ファイル</label>
+      <input type="file" id="payslip-upload-file" accept="application/pdf,image/*">
+      <div id="payslip-upload-file-name" class="fs-11 mt-6"></div>
+      <p class="muted mt-8">登録後のファイル名：<span class="mono" id="payslip-upload-preview"></span></p>
+      <button class="btn mt-10 w-full" id="btn-payslip-upload-submit">登録する</button>
+      <p class="muted mt-6" id="payslip-upload-status"></p>
+    </div>
     <div class="card" id="card-admin-special-periods">
       <div class="row mb-2">
         <div class="section-title mb-0">🏖️ 特別休暇・有給関連の設定</div>
@@ -1815,7 +1843,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.10.12';
+const APP_VERSION_HTML = '2026.09.14.01';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2628,6 +2656,7 @@ function applyAdminVisibilitySafe(){
   const logsCard = document.getElementById('card-admin-logs');
   const sysCard = document.getElementById('card-admin-system');
   const usersCard = document.getElementById('card-admin-users');
+  const payslipUploadCard = document.getElementById('card-admin-payslip-upload');
   const specialPeriodsCard = document.getElementById('card-admin-special-periods');
   const maintTab = document.getElementById('tab-maintenance');
   const settingsAdminDivider = document.getElementById('settings-admin-divider');
@@ -2639,6 +2668,7 @@ function applyAdminVisibilitySafe(){
   if(logsCard) logsCard.style.display = 'none';
   if(sysCard) sysCard.style.display = 'none';
   if(usersCard) usersCard.style.display = 'none';
+  if(payslipUploadCard) payslipUploadCard.style.display = 'none';
   if(specialPeriodsCard) specialPeriodsCard.style.display = 'none';
   if(maintTab) maintTab.style.display = 'none';
   if(settingsAdminDivider) settingsAdminDivider.style.display = 'none';
@@ -2678,6 +2708,7 @@ function applyAdminVisibility(isAdmin){
   const logsCard = document.getElementById('card-admin-logs');
   const sysCard = document.getElementById('card-admin-system');
   const usersCard = document.getElementById('card-admin-users');
+  const payslipUploadCard = document.getElementById('card-admin-payslip-upload');
   const specialPeriodsCard = document.getElementById('card-admin-special-periods');
   const maintTab = document.getElementById('tab-maintenance');
   const settingsAdminDivider = document.getElementById('settings-admin-divider');
@@ -2688,6 +2719,7 @@ function applyAdminVisibility(isAdmin){
   if(logsCard) logsCard.style.display = isAdmin ? 'block' : 'none';
   if(sysCard) sysCard.style.display = isAdmin ? 'block' : 'none';
   if(usersCard) usersCard.style.display = isAdmin ? 'block' : 'none';
+  if(payslipUploadCard) payslipUploadCard.style.display = isAdmin ? 'block' : 'none';
   if(specialPeriodsCard) specialPeriodsCard.style.display = isAdmin ? 'block' : 'none';
   if(maintTab) maintTab.style.display = isAdmin ? 'flex' : 'none';
   if(settingsAdminDivider) settingsAdminDivider.style.display = isAdmin ? 'block' : 'none';
@@ -3734,7 +3766,9 @@ document.getElementById('btn-confirm-create-user').addEventListener('click', asy
   });
 });
 
-// 検索結果が複数件の場合、および「一覧から選択」モーダルの両方で使う共通の一覧行描画処理
+// 検索結果が複数件の場合、および「一覧から選択」モーダルの両方で使う共通の一覧行描画処理。
+// onSelectedにはadminSearchUserの結果(idやfolderIdを含む詳細)がそのまま渡されるので、
+// 呼び出し側が「ユーザー管理カードに反映する」「他の用途に使う」を自由に決められる。
 function renderAdminUserRows(container, matches, onSelected){
   container.innerHTML = matches.map(m=>
     `<div class="log-item admin-multi-row" data-id="${m.id}" style="cursor:pointer;"><div style="${m.deleted?'color:#c0392b;':''}">${m.id}：${m.seiKana}${m.meiKana}${m.deleted?'（削除済み）':''}</div></div>`
@@ -3743,23 +3777,25 @@ function renderAdminUserRows(container, matches, onSelected){
   rows.forEach(el=>{
     el.addEventListener('click', async ()=>{
       // 読み込み中に別の行を押せてしまうと、途中で別の人を読み込んでしまう不具合になるため、
-      // クリックした瞬間に一覧を閉じ（モーダルの場合）、一覧自体も操作不可にする。
+      // クリックした瞬間に一覧自体を操作不可にする。
       rows.forEach(r=>{ r.style.pointerEvents = 'none'; r.style.opacity = '0.5'; });
-      if(onSelected) onSelected();
-      const status = document.getElementById('admin-search-status');
-      status.textContent = '読み込んでいます…';
       const url2 = `${COMPANY_SCRIPT_URL}?action=adminSearchUser&targetId=${encodeURIComponent(el.dataset.id)}`;
       const data2 = await jsonpRequest(url2);
-      if(data2.error){ status.textContent = data2.error; return; }
-      document.getElementById('admin-search-id').value = data2.id;
-      loadUserDetailIntoForm({ id: data2.id, folderId: data2.folderId, userInfo: data2.userInfo, byYear: data2.byYear, individualGrantDate: data2.individualGrantDate, individualGrantDays: data2.individualGrantDays });
-      status.textContent = `社員ID「${data2.id}」を選択しました。`;
+      if(onSelected) onSelected(data2);
     });
   });
 }
+// ユーザー管理カードの検索結果・一覧から選んだユーザーを、そのままカードのフォームへ反映する
+function loadUserSearchResult(data2){
+  const status = document.getElementById('admin-search-status');
+  if(data2.error){ status.textContent = data2.error; return; }
+  document.getElementById('admin-search-id').value = data2.id;
+  loadUserDetailIntoForm({ id: data2.id, folderId: data2.folderId, userInfo: data2.userInfo, byYear: data2.byYear, individualGrantDate: data2.individualGrantDate, individualGrantDays: data2.individualGrantDays });
+  status.textContent = `社員ID「${data2.id}」を選択しました。`;
+}
 function renderAdminUserMultiList(matches){
   const multiEl = document.getElementById('admin-user-multi');
-  renderAdminUserRows(multiEl, matches);
+  renderAdminUserRows(multiEl, matches, loadUserSearchResult);
   multiEl.style.display = 'block';
   setUserSearchActive(true);
 }
@@ -3787,26 +3823,91 @@ document.getElementById('btn-admin-search').addEventListener('click', async ()=>
     setUserSearchActive(false);
   }
 });
-document.getElementById('btn-admin-list-all').addEventListener('click', async ()=>{
+// 全社員一覧モーダルを開く。onSelectedにはadminSearchUserの詳細が渡され、呼び出し側で処理した後
+// モーダルが自動で閉じる。ユーザー管理カードの「一覧から選択」、給与明細の代理登録カードの
+// ユーザー選択など、複数の場所から共通で使う。
+function openAdminUserListModal(onSelected){
   const modal = document.getElementById('admin-user-list-modal');
   const modalStatus = document.getElementById('admin-user-list-modal-status');
   const modalBody = document.getElementById('admin-user-list-modal-body');
   modalBody.innerHTML = '';
   modalStatus.textContent = '読み込んでいます…';
   modal.classList.remove('hidden');
-  try{
-    const url = `${COMPANY_SCRIPT_URL}?action=adminListAllUsers`;
-    const data = await jsonpRequest(url);
-    if(data.error){ modalStatus.textContent = data.error; return; }
-    modalStatus.textContent = `全${data.matches.length}名（クリックして選択）`;
-    renderAdminUserRows(modalBody, data.matches, ()=>{ modal.classList.add('hidden'); });
-  }catch(e){
-    modalStatus.textContent = '読み込みに失敗しました：' + e.message;
-  }
+  (async ()=>{
+    try{
+      const url = `${COMPANY_SCRIPT_URL}?action=adminListAllUsers`;
+      const data = await jsonpRequest(url);
+      if(data.error){ modalStatus.textContent = data.error; return; }
+      modalStatus.textContent = `全${data.matches.length}名（クリックして選択）`;
+      renderAdminUserRows(modalBody, data.matches, (data2)=>{
+        onSelected(data2);
+        modal.classList.add('hidden');
+      });
+    }catch(e){
+      modalStatus.textContent = '読み込みに失敗しました：' + e.message;
+    }
+  })();
+}
+document.getElementById('btn-admin-list-all').addEventListener('click', ()=>{
+  openAdminUserListModal(loadUserSearchResult);
 });
 document.getElementById('admin-user-list-modal-close').addEventListener('click', ()=>{
   document.getElementById('admin-user-list-modal').classList.add('hidden');
 });
+
+// 保守タブ「給与明細の代理登録」：対象ユーザー選択・ファイル名プレビュー・アップロード
+let payslipUploadTarget = null; // {id, folderId, name}
+document.getElementById('btn-payslip-upload-select-user').addEventListener('click', ()=>{
+  openAdminUserListModal((data2)=>{
+    const statusEl = document.getElementById('payslip-upload-user-status');
+    if(data2.error){ statusEl.textContent = data2.error; return; }
+    const name = `${data2.userInfo.sei||''}${data2.userInfo.mei||''}`.trim() || data2.id;
+    payslipUploadTarget = { id: data2.id, folderId: data2.folderId, name };
+    statusEl.textContent = `選択中：${data2.id}：${name}`;
+  });
+});
+function updatePayslipUploadPreview(){
+  const company = document.getElementById('payslip-upload-company').value;
+  const category = document.getElementById('payslip-upload-category').value;
+  const y = document.getElementById('payslip-upload-year').value;
+  const mo = document.getElementById('payslip-upload-month').value;
+  const day = document.getElementById('payslip-upload-day').value;
+  document.getElementById('payslip-upload-preview').textContent = (y && mo) ? buildPdfBaseFilename(company, category, y, mo, day) : '';
+}
+['payslip-upload-company','payslip-upload-category','payslip-upload-year','payslip-upload-month','payslip-upload-day'].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener('input', updatePayslipUploadPreview);
+  el.addEventListener('change', updatePayslipUploadPreview);
+});
+document.getElementById('payslip-upload-file').addEventListener('change', ()=>{
+  const f = document.getElementById('payslip-upload-file').files[0];
+  document.getElementById('payslip-upload-file-name').textContent = f ? f.name : '';
+});
+document.getElementById('btn-payslip-upload-submit').addEventListener('click', async ()=>{
+  const status = document.getElementById('payslip-upload-status');
+  if(!payslipUploadTarget){ status.textContent = '対象ユーザーを選択してください。'; return; }
+  const company = document.getElementById('payslip-upload-company').value;
+  const category = document.getElementById('payslip-upload-category').value;
+  const y = document.getElementById('payslip-upload-year').value;
+  const mo = document.getElementById('payslip-upload-month').value;
+  const day = document.getElementById('payslip-upload-day').value;
+  if(!y || !mo){ status.textContent = '対象年月を入力してください。'; return; }
+  const file = document.getElementById('payslip-upload-file').files[0];
+  if(!file){ status.textContent = 'ファイルを選択してください。'; return; }
+  const filename = buildPdfBaseFilename(company, category, y, mo, day);
+  const submitBtn = document.getElementById('btn-payslip-upload-submit');
+  status.textContent = 'アップロードしています…';
+  try{
+    await withButtonBusy(submitBtn, ()=>uploadFileToDrive(file, filename, null, payslipUploadTarget.folderId));
+    status.textContent = `「${payslipUploadTarget.name}」さんの ${filename} を登録しました。`;
+    logEvent('admin_change', `${payslipUploadTarget.id}：${payslipUploadTarget.name} の給与明細を代理登録（${filename}）`);
+    document.getElementById('payslip-upload-file').value = '';
+    document.getElementById('payslip-upload-file-name').textContent = '';
+  }catch(e){
+    status.textContent = '登録に失敗しました：' + e.message;
+  }
+});
+
 document.getElementById('admin-search-id').addEventListener('keydown', (ev)=>{
   if(ev.key === 'Enter'){ ev.preventDefault(); document.getElementById('btn-admin-search').click(); }
 });
@@ -7043,10 +7144,13 @@ function fileToBase64(file){
   });
 }
 
-async function uploadFileToDrive(file, filename, onProgress){
-  if(!settings.scriptUrl || !settings.driveFolderId) throw new Error('フォルダが未設定です');
+async function uploadFileToDrive(file, filename, onProgress, folderIdOverride){
+  // folderIdOverrideを渡すと、自分自身のDriveフォルダではなく指定した別フォルダへアップロードする
+  // （保守タブの「給与明細の代理登録」機能で、対象従業員のフォルダへ直接登録するために使う）。
+  const folderId = folderIdOverride || settings.driveFolderId;
+  if(!settings.scriptUrl || !folderId) throw new Error('フォルダが未設定です');
   const base64 = await fileToBase64(file);
-  const startUrl = `${settings.scriptUrl}?action=uploadChunkStart&folder=${encodeURIComponent(settings.driveFolderId)}`;
+  const startUrl = `${settings.scriptUrl}?action=uploadChunkStart&folder=${encodeURIComponent(folderId)}`;
   const startData = await jsonpRequest(startUrl);
   if(startData.error) throw new Error(startData.error);
   const tempDocId = startData.tempDocId;
@@ -7059,7 +7163,7 @@ async function uploadFileToDrive(file, filename, onProgress){
     if(appendData.error) throw new Error(appendData.error);
     if(onProgress) onProgress(i+1, totalChunks);
   }
-  const finishUrl = `${settings.scriptUrl}?action=uploadChunkFinish&tempDocId=${encodeURIComponent(tempDocId)}&folder=${encodeURIComponent(settings.driveFolderId)}&filename=${encodeURIComponent(filename)}&mimeType=${encodeURIComponent(file.type||'application/pdf')}`;
+  const finishUrl = `${settings.scriptUrl}?action=uploadChunkFinish&tempDocId=${encodeURIComponent(tempDocId)}&folder=${encodeURIComponent(folderId)}&filename=${encodeURIComponent(filename)}&mimeType=${encodeURIComponent(file.type||'application/pdf')}`;
   const finishData = await jsonpRequest(finishUrl);
   if(finishData.error) throw new Error(finishData.error);
   return finishData;
