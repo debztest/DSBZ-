@@ -1868,7 +1868,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.03';
+const APP_VERSION_HTML = '2026.09.14.04';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3972,7 +3972,9 @@ document.getElementById('btn-payslip-upload-submit').addEventListener('click', a
   const submitBtn = document.getElementById('btn-payslip-upload-submit');
   status.textContent = 'アップロードしています…';
   try{
-    await withButtonBusy(submitBtn, ()=>uploadFileToDrive(file, filename, null, payslipUploadTarget.folderId));
+    await withButtonBusy(submitBtn, ()=>uploadFileToDrive(file, filename, (done, total)=>{
+      status.textContent = `アップロードしています…（${done}/${total}）`;
+    }, payslipUploadTarget.folderId));
     status.textContent = `「${payslipUploadTarget.name}」さんの ${filename} を登録しました。`;
     logEvent('admin_change', `${payslipUploadTarget.id}：${payslipUploadTarget.name} の給与明細を代理登録（${filename}）`);
     document.getElementById('payslip-upload-file').value = '';
@@ -4097,7 +4099,12 @@ document.getElementById('payslip-bulk-rows').addEventListener('click', (ev)=>{
       row.status = 'アップロードしています…';
       renderBulkRows();
       try{
-        await uploadFileToDrive(row.file, filename, null, row.target.folderId);
+        await uploadFileToDrive(row.file, filename, (done, total)=>{
+          // 一覧全体を再描画すると他の行の入力中フォーカスが飛ぶため、この行の状態表示だけ直接更新する
+          row.status = `アップロードしています…（${done}/${total}）`;
+          const statusEl = document.getElementById('payslip-bulk-rows').querySelector(`[data-bulk-row-status="${i}"]`);
+          if(statusEl) statusEl.textContent = row.status;
+        }, row.target.folderId);
         row.done = true;
         row.status = `「${row.target.name}」さんの ${filename} を登録しました。`;
         logEvent('admin_change', `${row.target.id}：${row.target.name} の給与明細を一括登録（${filename}）`);
