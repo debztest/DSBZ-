@@ -31,6 +31,9 @@
   --danger-soft:#F5E2DF;
   --success:#2F7D4F;
   --success-soft:#DCF2E3;
+  --gold:#B8860B;
+  --indigo:#5C6BC0;
+  --gray:#6B7280;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Zen Kaku Gothic New',sans-serif;-webkit-tap-highlight-color:transparent;}
@@ -65,6 +68,17 @@ main[data-font-scale="large"]{zoom:1.15;}
 /* 保守タブ・設定タブは項目数が多く見分けにくいため、枠を太く・左に色帯を付けて1項目ずつ目立たせる（全項目で統一の見た目） */
 #view-maintenance .card,#view-settings .card{border-width:2px;border-left-width:6px;border-left-color:var(--accent);}
 #view-maintenance .section-title,#view-settings .section-title{font-size:17px;color:var(--accent);}
+/* 保守タブ内はカードの種類ごとに色分けする */
+#view-maintenance #card-admin-news{border-left-color:var(--border);}
+#view-maintenance #card-admin-news .section-title{color:var(--text);}
+#view-maintenance #card-admin-new-user{border-left-color:var(--gold);}
+#view-maintenance #card-admin-new-user .section-title{color:var(--gold);}
+#view-maintenance #card-admin-payslip-upload{border-left-color:var(--accent);}
+#view-maintenance #card-admin-payslip-upload .section-title{color:var(--accent);}
+#view-maintenance #card-admin-special-periods,#view-maintenance #card-admin-leave-types{border-left-color:var(--indigo);}
+#view-maintenance #card-admin-special-periods .section-title,#view-maintenance #card-admin-leave-types .section-title{color:var(--indigo);}
+#view-maintenance #card-admin-logs,#view-maintenance #card-gas-update{border-left-color:var(--gray);}
+#view-maintenance #card-admin-logs .section-title,#view-maintenance #card-gas-update .section-title{color:var(--gray);}
 .card.searching{background:#E3F4FB;border-color:#9BD8EF;}
 .card.admin-closed-hint{background:#E5F6EA;border-color:#A9DDB9;}
 .card:not(.no-focus-highlight):focus-within{background:#E3F4FB;border-color:#9BD8EF;}
@@ -1238,7 +1252,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <button class="btn ghost small mt-8 w-full" id="btn-post-news">送信する</button>
       <p class="muted mt-6" id="post-news-status"></p>
     </div>
-    <div class="card">
+    <div class="card" id="card-admin-new-user">
       <div class="row mb-2">
         <div class="section-title mb-0">➕ 新規ユーザー追加</div>
         <button class="btn ghost small" id="btn-new-user-toggle">追加</button>
@@ -1887,7 +1901,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.09';
+const APP_VERSION_HTML = '2026.09.14.10';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
