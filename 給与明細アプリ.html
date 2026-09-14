@@ -103,6 +103,9 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .contact-cat-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .daytype-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 #chart-yearly-toggle.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+/* 1年間モードの切り替えボタンは、ホバーでは色を変えずクリックした時だけ状態が変わるようにする */
+#chart-yearly-toggle:hover{background:var(--surface-2);color:var(--accent);border-color:var(--accent-soft);}
+#chart-yearly-toggle.active:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
 .btn.small{width:auto;padding:8px 14px;font-size:13px;}
 .btn.ghost{background:var(--surface-2);color:var(--accent);border:1px solid var(--accent-soft);font-weight:700;}
 .btn.ghost:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
@@ -1908,7 +1911,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.20';
+const APP_VERSION_HTML = '2026.09.14.21';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -9561,13 +9564,20 @@ function renderSalaryChart(){
   const GRID_STEP = 50000;
   const maxVal = Math.ceil(maxRaw / GRID_STEP) * GRID_STEP || GRID_STEP;
 
-  const W = 320, H = 196, padBottom = 28, padTop = 14, padLeft = 30;
+  const H = 196, padBottom = 28, padTop = 14, padLeft = 30;
   const gapX = 12;
-  const plotW = W - padLeft - 6;
+  const MIN_UNIT_W = 14;
   // 棒が増えた月は、最大3ヶ月分ぶんの幅まで広げてよい。
   recent.forEach(e=>{ e.units = Math.max(1, Math.min(3, e.salaries.length + e.bonuses.length)); });
   const totalUnits = recent.reduce((s,e)=>s+e.units, 0) || recent.length || 1;
-  const unitW = Math.max(14, (plotW - gapX*(recent.length+1)) / totalUnits);
+  // 通常表示（6ヶ月）の見た目はそのまま、1年間モードなど棒の本数が多い時は
+  // 横幅を必要な分だけ広げる（最小幅14pxを下回って棒が重なり合ったり、
+  // 見切れたりしないようにする）。
+  const baseW = 320;
+  const neededPlotW = MIN_UNIT_W*totalUnits + gapX*(recent.length+1);
+  const plotW = Math.max(baseW - padLeft - 6, neededPlotW);
+  const W = plotW + padLeft + 6;
+  const unitW = (plotW - gapX*(recent.length+1)) / totalUnits;
   let cursorX = padLeft + gapX;
   recent.forEach(e=>{
     e.slotX = cursorX;
