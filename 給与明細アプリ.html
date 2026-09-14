@@ -1906,7 +1906,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.16';
+const APP_VERSION_HTML = '2026.09.14.17';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -7890,8 +7890,16 @@ async function openFile(doc, label, payKey){
   modalViewerRotation = 0;
   const viewer = document.getElementById('modal-viewer');
   viewer.innerHTML = '<p style="color:#eee;text-align:center;margin-top:40px;">読み込み中…</p>';
+  // 通常はすぐ終わるが、Googleサーバー側が混み合っていると数十秒かかることがあり、
+  // 何も表示が変わらないと「固まった」と誤解されやすいため、少し待っても終わらない場合は
+  // 案内文を追加する（読み込み自体は続けたまま）。
+  const slowLoadTimer = setTimeout(()=>{
+    const p = viewer.querySelector('p');
+    if(p) p.textContent = '読み込み中…（Googleサーバーが混み合っており、時間がかかっています。最大45秒ほどお待ちください）';
+  }, 6000);
   try{
     if(!doc._bytes){ doc._bytes = await fetchFileBytes(doc); }
+    clearTimeout(slowLoadTimer);
     const mime = doc._mimeType || 'application/pdf';
     viewer.innerHTML = '';
     const rotateWrap = document.createElement('div');
@@ -7911,6 +7919,7 @@ async function openFile(doc, label, payKey){
     }
     applyModalViewerRotation();
   }catch(e){
+    clearTimeout(slowLoadTimer);
     viewer.innerHTML = `<p style="color:#f5c2c0;text-align:center;margin-top:40px;padding:0 16px;">表示に失敗しました：${e.message}</p>`;
   }
 }
