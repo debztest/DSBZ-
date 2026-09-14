@@ -1882,7 +1882,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.07';
+const APP_VERSION_HTML = '2026.09.14.08';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3779,10 +3779,13 @@ document.getElementById('btn-confirm-create-user').addEventListener('click', asy
   status.textContent = '作成しています…（フォルダとドキュメントの作成のため少し時間がかかります）';
   await withButtonBusy(ev.currentTarget, async ()=>{
   try{
-    const url = `${COMPANY_SCRIPT_URL}?action=adminCreateUser&newId=${encodeURIComponent(newId)}&newPassword=${encodeURIComponent(newPw)}&role=${encodeURIComponent(role)}&sei=${encodeURIComponent(sei)}&mei=${encodeURIComponent(mei)}&seiKana=${encodeURIComponent(seiKana)}&meiKana=${encodeURIComponent(meiKana)}&dob=${encodeURIComponent(dob)}&baseSalary=${encodeURIComponent(baseSalary)}&isExecutive=${encodeURIComponent(isExecutive)}&notifyEmail=${encodeURIComponent(notifyEmail)}`;
+    // メール送信をここに同居させると1回の通信が重くなり、レスポンスが返る前にクライアント側が
+    // タイムアウト扱いにしてしまう不具合があったため、ユーザー作成本体とは別の通信に分けてある
+    // （実際には作成できているのに失敗表示になる、という紛らわしい状態を避けるため）。
+    const url = `${COMPANY_SCRIPT_URL}?action=adminCreateUser&newId=${encodeURIComponent(newId)}&newPassword=${encodeURIComponent(newPw)}&role=${encodeURIComponent(role)}&sei=${encodeURIComponent(sei)}&mei=${encodeURIComponent(mei)}&seiKana=${encodeURIComponent(seiKana)}&meiKana=${encodeURIComponent(meiKana)}&dob=${encodeURIComponent(dob)}&baseSalary=${encodeURIComponent(baseSalary)}&isExecutive=${encodeURIComponent(isExecutive)}`;
     const data = await jsonpRequest(url);
     if(data.error){ status.textContent = data.error; return; }
-    const createdMsg = `社員ID「${data.id}」を作成しました。` + (notifyEmail ? '登録完了メールを送信しました。' : '');
+    let createdMsg = `社員ID「${data.id}」を作成しました。`;
     status.textContent = createdMsg;
     document.getElementById('create-user-status').textContent = createdMsg;
     availableIdsPages = [];
@@ -3799,6 +3802,20 @@ document.getElementById('btn-confirm-create-user').addEventListener('click', asy
     document.getElementById('new-user-notify-email').value = '';
     document.getElementById('new-user-executive').checked = false;
     logEvent('admin_change', `新規ユーザー作成：${data.id}（${sei}${mei}）`);
+    if(notifyEmail){
+      status.textContent = createdMsg + ' 登録完了メールを送信しています…';
+      try{
+        const mailUrl = `${COMPANY_SCRIPT_URL}?action=sendUserNoticeEmail&newId=${encodeURIComponent(data.id)}&newPassword=${encodeURIComponent(newPw)}&sei=${encodeURIComponent(sei)}&mei=${encodeURIComponent(mei)}&seiKana=${encodeURIComponent(seiKana)}&meiKana=${encodeURIComponent(meiKana)}&dob=${encodeURIComponent(dob)}&notifyEmail=${encodeURIComponent(notifyEmail)}`;
+        const mailData = await jsonpRequest(mailUrl);
+        createdMsg = mailData.error
+          ? `${createdMsg}（登録完了メールの送信に失敗：${mailData.error}）`
+          : `${createdMsg}登録完了メールを送信しました。`;
+      }catch(mailE){
+        createdMsg = `${createdMsg}（登録完了メールの送信に失敗：${mailE.message}）`;
+      }
+      status.textContent = createdMsg;
+      document.getElementById('create-user-status').textContent = createdMsg;
+    }
     setTimeout(()=>{
       document.getElementById('create-user-modal').classList.add('hidden');
     }, 1200);
@@ -6460,7 +6477,6 @@ function doGet(e) {
         var newDobC = (e.parameter.dob || '').trim();
         var newBaseSalaryC = (e.parameter.baseSalary || '0').trim();
         var newIsExecutiveC = (e.parameter.isExecutive || '0').trim();
-        var newNotifyEmailC = (e.parameter.notifyEmail || '').trim();
         if (!newIdC || !newPwC) {
           out = { error: '社員IDとパスワードを入力してください' };
         } else if (findEmployeeRowSS(ssC, newIdC)) {
@@ -6491,37 +6507,51 @@ function doGet(e) {
           appendRowAsText(ssC.getSheetByName('ユーザー情報'), [newIdC, newSeiC, newMeiC, newSeiKanaC, newMeiKanaC, newDobC, newRoleC, newIsExecutiveC, '', '', '', '', '']);
           sortEmployeeSheetById(ssC);
 
-          if (newNotifyEmailC) {
-            try {
-              var noticeSubject = 'ＤＳＢＺ給与明細ユーザー登録完了のお知らせ';
-              var noticeBody = [
-                '登録日時：' + formatJapaneseDateTimeWithWeekday(new Date()),
-                '',
-                'ユーザーＩＤ：' + newIdC,
-                '初期ＰＡＳＳ：' + newPwC,
-                '',
-                '登録名：' + newSeiC + '　' + newMeiC,
-                'とうろくめい：' + newSeiKanaC + '　' + newMeiKanaC,
-                '',
-                '生年月日　' + formatJapaneseDateFromIso(newDobC),
-                '',
-                '',
-                '以上の内容で登録しております。',
-                '内容に誤りがある場合は、下記に記載のメールアドレス宛にご連絡ください。',
-                getUserNoticeContactEmail(),
-                '',
-                'また、DSBZ給与のアプリのインストールがお済みでない場合、以下のURLよりインストールしてください。',
-                'https://debztest.github.io/DSBZ-/%E7%B5%A6%E4%B8%8E%E6%98%8E%E7%B4%B0%E3%82%A2%E3%83%97%E3%83%AA.html',
-                '',
-                'このメールはDSBZ給与より自動配信されています。'
-              ].join('\\n');
-              MailApp.sendEmail(newNotifyEmailC, noticeSubject, noticeBody);
-            } catch (mailErrC) {
-              // 通知メールの送信に失敗しても、ユーザー作成自体は成功として扱う
-            }
-          }
-
           out = { success: true, id: newIdC, folderId: newEmpFolderC.getId() };
+        }
+      }
+    } else if (action === 'sendUserNoticeEmail') {
+      // ユーザー作成本体（adminCreateUser）に同居させると1回の処理が重くなり、
+      // レスポンスが返る前にクライアント側がタイムアウト扱いにしてしまう不具合があったため、
+      // メール送信だけ独立した通信として分離した。
+      var neEmail = (e.parameter.notifyEmail || '').trim();
+      if (!neEmail) {
+        out = { error: '通知先メールアドレスが指定されていません' };
+      } else {
+        try {
+          var neId = (e.parameter.newId || '').trim();
+          var nePw = (e.parameter.newPassword || '').trim();
+          var neSei = (e.parameter.sei || '').trim();
+          var neMei = (e.parameter.mei || '').trim();
+          var neSeiKana = (e.parameter.seiKana || '').trim();
+          var neMeiKana = (e.parameter.meiKana || '').trim();
+          var neDob = (e.parameter.dob || '').trim();
+          var noticeSubject = 'ＤＳＢＺ給与明細ユーザー登録完了のお知らせ';
+          var noticeBody = [
+            '登録日時：' + formatJapaneseDateTimeWithWeekday(new Date()),
+            '',
+            'ユーザーＩＤ：' + neId,
+            '初期ＰＡＳＳ：' + nePw,
+            '',
+            '登録名：' + neSei + '　' + neMei,
+            'とうろくめい：' + neSeiKana + '　' + neMeiKana,
+            '',
+            '生年月日　' + formatJapaneseDateFromIso(neDob),
+            '',
+            '',
+            '以上の内容で登録しております。',
+            '内容に誤りがある場合は、下記に記載のメールアドレス宛にご連絡ください。',
+            getUserNoticeContactEmail(),
+            '',
+            'また、DSBZ給与のアプリのインストールがお済みでない場合、以下のURLよりインストールしてください。',
+            'https://debztest.github.io/DSBZ-/%E7%B5%A6%E4%B8%8E%E6%98%8E%E7%B4%B0%E3%82%A2%E3%83%97%E3%83%AA.html',
+            '',
+            'このメールはDSBZ給与より自動配信されています。'
+          ].join('\\n');
+          MailApp.sendEmail(neEmail, noticeSubject, noticeBody);
+          out = { success: true };
+        } catch (mailErr2) {
+          out = { error: 'メール送信に失敗しました：' + mailErr2.message };
         }
       }
     } else if (action === 'adminAvailableIds') {

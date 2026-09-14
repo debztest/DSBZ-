@@ -1330,7 +1330,6 @@ function doGet(e) {
         var newDobC = (e.parameter.dob || '').trim();
         var newBaseSalaryC = (e.parameter.baseSalary || '0').trim();
         var newIsExecutiveC = (e.parameter.isExecutive || '0').trim();
-        var newNotifyEmailC = (e.parameter.notifyEmail || '').trim();
         if (!newIdC || !newPwC) {
           out = { error: '社員IDとパスワードを入力してください' };
         } else if (findEmployeeRowSS(ssC, newIdC)) {
@@ -1361,37 +1360,51 @@ function doGet(e) {
           appendRowAsText(ssC.getSheetByName('ユーザー情報'), [newIdC, newSeiC, newMeiC, newSeiKanaC, newMeiKanaC, newDobC, newRoleC, newIsExecutiveC, '', '', '', '', '']);
           sortEmployeeSheetById(ssC);
 
-          if (newNotifyEmailC) {
-            try {
-              var noticeSubject = 'ＤＳＢＺ給与明細ユーザー登録完了のお知らせ';
-              var noticeBody = [
-                '登録日時：' + formatJapaneseDateTimeWithWeekday(new Date()),
-                '',
-                'ユーザーＩＤ：' + newIdC,
-                '初期ＰＡＳＳ：' + newPwC,
-                '',
-                '登録名：' + newSeiC + '　' + newMeiC,
-                'とうろくめい：' + newSeiKanaC + '　' + newMeiKanaC,
-                '',
-                '生年月日　' + formatJapaneseDateFromIso(newDobC),
-                '',
-                '',
-                '以上の内容で登録しております。',
-                '内容に誤りがある場合は、下記に記載のメールアドレス宛にご連絡ください。',
-                getUserNoticeContactEmail(),
-                '',
-                'また、DSBZ給与のアプリのインストールがお済みでない場合、以下のURLよりインストールしてください。',
-                'https://debztest.github.io/DSBZ-/%E7%B5%A6%E4%B8%8E%E6%98%8E%E7%B4%B0%E3%82%A2%E3%83%97%E3%83%AA.html',
-                '',
-                'このメールはDSBZ給与より自動配信されています。'
-              ].join('\n');
-              MailApp.sendEmail(newNotifyEmailC, noticeSubject, noticeBody);
-            } catch (mailErrC) {
-              // 通知メールの送信に失敗しても、ユーザー作成自体は成功として扱う
-            }
-          }
-
           out = { success: true, id: newIdC, folderId: newEmpFolderC.getId() };
+        }
+      }
+    } else if (action === 'sendUserNoticeEmail') {
+      // ユーザー作成本体（adminCreateUser）に同居させると1回の処理が重くなり、
+      // レスポンスが返る前にクライアント側がタイムアウト扱いにしてしまう不具合があったため、
+      // メール送信だけ独立した通信として分離した。
+      var neEmail = (e.parameter.notifyEmail || '').trim();
+      if (!neEmail) {
+        out = { error: '通知先メールアドレスが指定されていません' };
+      } else {
+        try {
+          var neId = (e.parameter.newId || '').trim();
+          var nePw = (e.parameter.newPassword || '').trim();
+          var neSei = (e.parameter.sei || '').trim();
+          var neMei = (e.parameter.mei || '').trim();
+          var neSeiKana = (e.parameter.seiKana || '').trim();
+          var neMeiKana = (e.parameter.meiKana || '').trim();
+          var neDob = (e.parameter.dob || '').trim();
+          var noticeSubject = 'ＤＳＢＺ給与明細ユーザー登録完了のお知らせ';
+          var noticeBody = [
+            '登録日時：' + formatJapaneseDateTimeWithWeekday(new Date()),
+            '',
+            'ユーザーＩＤ：' + neId,
+            '初期ＰＡＳＳ：' + nePw,
+            '',
+            '登録名：' + neSei + '　' + neMei,
+            'とうろくめい：' + neSeiKana + '　' + neMeiKana,
+            '',
+            '生年月日　' + formatJapaneseDateFromIso(neDob),
+            '',
+            '',
+            '以上の内容で登録しております。',
+            '内容に誤りがある場合は、下記に記載のメールアドレス宛にご連絡ください。',
+            getUserNoticeContactEmail(),
+            '',
+            'また、DSBZ給与のアプリのインストールがお済みでない場合、以下のURLよりインストールしてください。',
+            'https://debztest.github.io/DSBZ-/%E7%B5%A6%E4%B8%8E%E6%98%8E%E7%B4%B0%E3%82%A2%E3%83%97%E3%83%AA.html',
+            '',
+            'このメールはDSBZ給与より自動配信されています。'
+          ].join('\n');
+          MailApp.sendEmail(neEmail, noticeSubject, noticeBody);
+          out = { success: true };
+        } catch (mailErr2) {
+          out = { error: 'メール送信に失敗しました：' + mailErr2.message };
         }
       }
     } else if (action === 'adminAvailableIds') {
