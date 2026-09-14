@@ -1489,7 +1489,11 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <div class="helptext">操作ログが増え続けるとデータが肥大化するため、内容を日付入りのアーカイブドキュメントへ書き出し、本体のログを空にします（削除ではなく退避です）。自動で毎週圧縮するには、Apps Scriptの編集画面で「トリガー」から compressSystemLogs 関数を時間主導型（週タイマー）で追加してください。</div>
     </div>
     <div class="card" id="card-gas-update" style="display:none;">
-      <div class="section-title">🛠️ GAS更新依頼</div>
+      <div class="row mb-2">
+        <div class="section-title mb-0">🛠️ GAS更新依頼</div>
+        <button class="btn ghost small collapsible-toggle">開く</button>
+      </div>
+      <div class="collapsible-body is-hidden">
       <p class="muted mt-0">更新後のGAS_CODE.gsファイルと更新目的を添えて、担当者に更新を依頼できます。</p>
       <label class="field mt-0">更新後のGASファイル（.gs・必須）</label>
       <input type="file" id="gasupdate-file" accept=".gs,text/plain">
@@ -1498,6 +1502,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <textarea id="gasupdate-purpose" rows="4" class="contact-textarea" placeholder="例：ログイン処理の不具合修正のため"></textarea>
       <button class="btn ghost small mt-8 w-full" id="btn-send-gasupdate">依頼を送る</button>
       <p class="muted mt-6" id="gasupdate-status"></p>
+      </div>
     </div>
   </section>
 
@@ -1882,7 +1887,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.08';
+const APP_VERSION_HTML = '2026.09.14.09';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3623,7 +3628,7 @@ document.getElementById('btn-new-user-toggle').addEventListener('click', ()=>{
   document.getElementById('btn-new-user-toggle').textContent = showing ? '追加' : '閉じる';
 });
 
-['card-admin-system','card-pay-rules','card-transport-admin-summary','card-admin-special-periods','card-admin-leave-types','card-commute-pass','card-admin-payslip-upload'].forEach(cardId=>{
+['card-admin-system','card-pay-rules','card-transport-admin-summary','card-admin-special-periods','card-admin-leave-types','card-commute-pass','card-admin-payslip-upload','card-gas-update'].forEach(cardId=>{
   const card = document.getElementById(cardId);
   if(!card) return;
   const toggleBtn = card.querySelector('.collapsible-toggle');
