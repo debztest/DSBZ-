@@ -1355,7 +1355,11 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       </div>
     </div>
     <div class="card" id="card-admin-payslip-upload" style="display:none;">
-      <div class="section-title">📄 給与明細の代理登録</div>
+      <div class="row mb-2">
+        <div class="section-title mb-0">📄 給与明細の代理登録</div>
+        <button class="btn ghost small collapsible-toggle">開く</button>
+      </div>
+      <div class="collapsible-body is-hidden">
       <p class="muted mt-0">従業員に代わって、給与明細PDFをDriveへ登録できます。ここから登録した明細は、明細一覧に削除ボタンが表示されません。</p>
       <label class="field mt-0">①対象ユーザー（社員ID または 苗字（ひらがな））</label>
       <div class="row" style="gap:8px;">
@@ -1388,6 +1392,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <div class="divider-16"></div>
       <p class="muted mt-0">フォルダごとまとめて登録したい場合はこちら。フォルダ内のファイルを1件ずつ確認しながら登録できます。</p>
       <button class="btn ghost small w-full" id="btn-payslip-bulk-open">フォルダから一括登録する</button>
+      </div>
     </div>
     <div class="card" id="card-admin-special-periods">
       <div class="row mb-2">
@@ -1868,7 +1873,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.05';
+const APP_VERSION_HTML = '2026.09.14.06';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3609,7 +3614,7 @@ document.getElementById('btn-new-user-toggle').addEventListener('click', ()=>{
   document.getElementById('btn-new-user-toggle').textContent = showing ? '追加' : '閉じる';
 });
 
-['card-admin-system','card-pay-rules','card-transport-admin-summary','card-admin-special-periods','card-admin-leave-types','card-commute-pass'].forEach(cardId=>{
+['card-admin-system','card-pay-rules','card-transport-admin-summary','card-admin-special-periods','card-admin-leave-types','card-commute-pass','card-admin-payslip-upload'].forEach(cardId=>{
   const card = document.getElementById(cardId);
   if(!card) return;
   const toggleBtn = card.querySelector('.collapsible-toggle');
