@@ -1906,7 +1906,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.14';
+const APP_VERSION_HTML = '2026.09.14.15';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2749,6 +2749,9 @@ function resetPersonalDataForLogin(){
   saveJSON('otHoursByMonth', otHoursByMonth);
   payHistory = {};
   saveJSON('payHistory', payHistory);
+  // 新しいログインのたびに、Drive側の内容を確認し直すまではpushSettingsToDrive()を止める
+  // （前のユーザーの確認済みフラグが残ったまま新しいユーザーのデータを書き込んでしまうのを防ぐ）
+  driveSettingsSynced = false;
   documents = [];
   saveJSON('documents', []);
   driveDocs = [];
@@ -5158,6 +5161,12 @@ if(!leave.byYear){
 }
 let otHoursByMonth = loadJSON('otHoursByMonth', {});
 let payHistory = loadJSON('payHistory', {});
+// ログイン直後はローカルの実績・有給データを一度空にし、Driveから読み直して復元する仕組みになっている。
+// その読み直し(pullSettingsFromDrive)が（今日のような一時的な不調で）失敗した状態のまま、
+// 空のデータをそのままDriveへ書き込んでしまうと、既存の実績・有給データが消えてしまう重大な
+// 事故になる。これを防ぐため、「Driveの内容を確認できた（存在確認・復元のどちらか）」ことが
+// はっきりするまでは、pushSettingsToDrive()自体を止めるようにする。
+let driveSettingsSynced = false;
 (function migratePayHistory(){
   let changed = false;
   Object.keys(payHistory).forEach(ym=>{
@@ -8682,8 +8691,14 @@ async function pullSettingsFromDrive(retriesLeft){
       showSyncWarningBanner(true);
       return;
     }
-    if(!data.exists){ status.textContent = 'Drive上に設定ドキュメントはまだありません（今すぐ同期で作成されます）。'; return; }
+    if(!data.exists){
+      // ドキュメントが存在しないこと自体は「確認できた」ので、新規作成のための書き込みは許可する
+      driveSettingsSynced = true;
+      status.textContent = 'Drive上に設定ドキュメントはまだありません（今すぐ同期で作成されます）。';
+      return;
+    }
     showSyncWarningBanner(false);
+    driveSettingsSynced = true;
     const parsed = parseSettingsText(data.content);
     Object.assign(settings, parsed.settings);
     saveJSON('settings', settings);
@@ -8737,6 +8752,14 @@ async function pullSettingsFromDrive(retriesLeft){
 async function pushSettingsToDrive(){
   if(!settings.scriptUrl || !settings.driveFolderId) return false;
   const status = document.getElementById('sync-status');
+  if(!driveSettingsSynced){
+    // Driveの内容をまだ確認できていない（pullSettingsFromDrive()が一度も成功していない）状態で
+    // 書き込むと、ログイン直後に空にしたローカルの実績・有給データで既存のDrive上のデータを
+    // 上書きして消してしまう事故につながるため、確認できるまでは書き込みを止める。
+    status.textContent = 'Driveの内容をまだ確認できていないため、保存を保留しています（時間をおいて自動的に再試行されます）。';
+    showSyncWarningBanner(true);
+    return false;
+  }
   status.textContent = 'Driveに設定を送信しています…';
   try{
     const content = encodeURIComponent(serializeSettingsText());
