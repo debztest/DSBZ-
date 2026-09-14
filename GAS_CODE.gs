@@ -642,25 +642,39 @@ function findUserInfoRowSS(ss, targetId) {
   return null;
 }
 
-// 「会社共通設定」シートをキー・値のオブジェクトとして読み込む
+// 「会社共通設定」シートをキー・値のオブジェクトとして読み込む。
+// ログインのたびに全員が読む、めったに変更されない全社共通データのため、
+// CacheServiceで少しの間キャッシュしてログインを高速化する（更新時は明示的にキャッシュを消す）。
 function readCompanySettingsSS(ss) {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('COMPANY_SETTINGS_CACHE');
+  if (cached) {
+    try { return JSON.parse(cached); } catch (eParseCS) { /* 壊れていたら読み直す */ }
+  }
   var data = getSheetData(ss, '会社共通設定');
   var result = {};
   data.rows.forEach(function (row) {
     var key = String(row[0] || '').trim();
     if (key) result[key] = String(row[1] === undefined || row[1] === null ? '' : row[1]);
   });
+  try { cache.put('COMPANY_SETTINGS_CACHE', JSON.stringify(result), 300); } catch (eCacheCS) { /* サイズ超過等は無視 */ }
   return result;
 }
 
-// 「給料日特例」シートをキー・値のオブジェクトとして読み込む
+// 「給料日特例」シートをキー・値のオブジェクトとして読み込む（会社共通設定と同様にキャッシュする）
 function readPaydayOverridesSS(ss) {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('PAYDAY_OVERRIDES_CACHE');
+  if (cached) {
+    try { return JSON.parse(cached); } catch (eParsePO) { /* 壊れていたら読み直す */ }
+  }
   var data = getSheetData(ss, '給料日特例');
   var result = {};
   data.rows.forEach(function (row) {
     var key = String(row[0] || '').trim();
     if (key) result[key] = String(row[1] === undefined || row[1] === null ? '' : row[1]);
   });
+  try { cache.put('PAYDAY_OVERRIDES_CACHE', JSON.stringify(result), 300); } catch (eCachePO) { /* サイズ超過等は無視 */ }
   return result;
 }
 
@@ -1024,6 +1038,7 @@ function doGet(e) {
         } else if (foundRowIdxP > 0) {
           sheetP.deleteRow(foundRowIdxP);
         }
+        try { CacheService.getScriptCache().remove('PAYDAY_OVERRIDES_CACHE'); } catch (eInvalidatePO) {}
         out = { success: true };
       }
     } else if (action === 'findUserByInfo') {
@@ -1707,6 +1722,7 @@ function doGet(e) {
             rowIdxByKeyCS[ukCS] = sheetCS.getLastRow();
           }
         }
+        try { CacheService.getScriptCache().remove('COMPANY_SETTINGS_CACHE'); } catch (eInvalidateCS) {}
         out = { success: true };
       }
     } else if (action === 'getRetentionDays') {
