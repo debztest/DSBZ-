@@ -1356,8 +1356,11 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     <div class="card" id="card-admin-payslip-upload" style="display:none;">
       <div class="section-title">📄 給与明細の代理登録</div>
       <p class="muted mt-0">従業員に代わって、給与明細PDFをDriveへ登録できます。ここから登録した明細は、明細一覧に削除ボタンが表示されません。</p>
-      <label class="field mt-0">①対象ユーザー</label>
-      <button class="btn ghost small w-full" id="btn-payslip-upload-select-user">ユーザーを選択</button>
+      <label class="field mt-0">①対象ユーザー（社員ID または 苗字（ひらがな））</label>
+      <div class="row" style="gap:8px;">
+        <input type="text" id="payslip-upload-user-query" placeholder="例：000 または やまだ" style="flex:1;">
+        <button class="btn ghost small" id="btn-payslip-upload-select-user" style="flex-shrink:0;">ユーザー一覧</button>
+      </div>
       <p class="muted mt-6" id="payslip-upload-user-status">まだ選択されていません。</p>
       <label class="field">②給与明細の種類</label>
       <select id="payslip-upload-company">
@@ -1843,7 +1846,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.01';
+const APP_VERSION_HTML = '2026.09.14.02';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3823,28 +3826,43 @@ document.getElementById('btn-admin-search').addEventListener('click', async ()=>
     setUserSearchActive(false);
   }
 });
-// 全社員一覧モーダルを開く。onSelectedにはadminSearchUserの詳細が渡され、呼び出し側で処理した後
-// モーダルが自動で閉じる。ユーザー管理カードの「一覧から選択」、給与明細の代理登録カードの
-// ユーザー選択など、複数の場所から共通で使う。
-function openAdminUserListModal(onSelected){
+// モーダル表示中、背景ページがスクロールで一緒に動いてしまわないようにする
+function lockBodyScroll(lock){
+  document.body.style.overflow = lock ? 'hidden' : '';
+}
+// 全社員一覧モーダルに一覧行を描画して開く（既に絞り込み済みのmatchesを渡す版）。
+// クリックして選択すると、onSelectedを呼んだ上でモーダルを自動的に閉じる。
+function openAdminUserListModalWithMatches(matches, onSelected){
   const modal = document.getElementById('admin-user-list-modal');
   const modalStatus = document.getElementById('admin-user-list-modal-status');
   const modalBody = document.getElementById('admin-user-list-modal-body');
-  modalBody.innerHTML = '';
-  modalStatus.textContent = '読み込んでいます…';
+  modalStatus.textContent = `${matches.length}名（クリックして選択）`;
   modal.classList.remove('hidden');
+  lockBodyScroll(true);
+  renderAdminUserRows(modalBody, matches, (data2)=>{
+    onSelected(data2);
+    modal.classList.add('hidden');
+    lockBodyScroll(false);
+  });
+}
+// 全社員一覧モーダルを開く（全件をこの場で取得する版）。ユーザー管理カードの「一覧から選択」、
+// 給与明細の代理登録カードのユーザー選択など、複数の場所から共通で使う。
+function openAdminUserListModal(onSelected){
+  const modal = document.getElementById('admin-user-list-modal');
+  const modalBody = document.getElementById('admin-user-list-modal-body');
+  const modalStatusEl = document.getElementById('admin-user-list-modal-status');
+  modalBody.innerHTML = '';
+  modalStatusEl.textContent = '読み込んでいます…';
+  modal.classList.remove('hidden');
+  lockBodyScroll(true);
   (async ()=>{
     try{
       const url = `${COMPANY_SCRIPT_URL}?action=adminListAllUsers`;
       const data = await jsonpRequest(url);
-      if(data.error){ modalStatus.textContent = data.error; return; }
-      modalStatus.textContent = `全${data.matches.length}名（クリックして選択）`;
-      renderAdminUserRows(modalBody, data.matches, (data2)=>{
-        onSelected(data2);
-        modal.classList.add('hidden');
-      });
+      if(data.error){ modalStatusEl.textContent = data.error; return; }
+      openAdminUserListModalWithMatches(data.matches, onSelected);
     }catch(e){
-      modalStatus.textContent = '読み込みに失敗しました：' + e.message;
+      modalStatusEl.textContent = '読み込みに失敗しました：' + e.message;
     }
   })();
 }
@@ -3853,18 +3871,44 @@ document.getElementById('btn-admin-list-all').addEventListener('click', ()=>{
 });
 document.getElementById('admin-user-list-modal-close').addEventListener('click', ()=>{
   document.getElementById('admin-user-list-modal').classList.add('hidden');
+  lockBodyScroll(false);
 });
 
 // 保守タブ「給与明細の代理登録」：対象ユーザー選択・ファイル名プレビュー・アップロード
 let payslipUploadTarget = null; // {id, folderId, name}
+function handlePayslipUserSelected(data2){
+  const statusEl = document.getElementById('payslip-upload-user-status');
+  if(data2.error){ statusEl.textContent = data2.error; return; }
+  const name = `${data2.userInfo.sei||''}${data2.userInfo.mei||''}`.trim() || data2.id;
+  payslipUploadTarget = { id: data2.id, folderId: data2.folderId, name };
+  statusEl.textContent = `選択中：${data2.id}：${name}`;
+}
 document.getElementById('btn-payslip-upload-select-user').addEventListener('click', ()=>{
-  openAdminUserListModal((data2)=>{
-    const statusEl = document.getElementById('payslip-upload-user-status');
-    if(data2.error){ statusEl.textContent = data2.error; return; }
-    const name = `${data2.userInfo.sei||''}${data2.userInfo.mei||''}`.trim() || data2.id;
-    payslipUploadTarget = { id: data2.id, folderId: data2.folderId, name };
-    statusEl.textContent = `選択中：${data2.id}：${name}`;
-  });
+  openAdminUserListModal(handlePayslipUserSelected);
+});
+document.getElementById('payslip-upload-user-query').addEventListener('keydown', async (ev)=>{
+  if(ev.key !== 'Enter') return;
+  ev.preventDefault();
+  const statusEl = document.getElementById('payslip-upload-user-status');
+  const query = document.getElementById('payslip-upload-user-query').value.trim();
+  if(!query){ statusEl.textContent = '社員IDまたは苗字（ひらがな）を入力してください。'; return; }
+  statusEl.textContent = '検索しています…';
+  try{
+    const url = `${COMPANY_SCRIPT_URL}?action=adminFindUsersByQuery&query=${encodeURIComponent(query)}`;
+    const data = await jsonpRequest(url);
+    if(data.error){ statusEl.textContent = data.error; return; }
+    if(data.mode === 'single'){
+      const d = data.detail;
+      const name = `${d.userInfo.sei||''}${d.userInfo.mei||''}`.trim() || d.id;
+      payslipUploadTarget = { id: d.id, folderId: d.folderId, name };
+      statusEl.textContent = `選択中：${d.id}：${name}`;
+    }else{
+      statusEl.textContent = `${data.matches.length}名ヒットしました。一覧から選んでください。`;
+      openAdminUserListModalWithMatches(data.matches, handlePayslipUserSelected);
+    }
+  }catch(e){
+    statusEl.textContent = '検索に失敗しました：' + e.message;
+  }
 });
 function updatePayslipUploadPreview(){
   const company = document.getElementById('payslip-upload-company').value;
