@@ -1906,7 +1906,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.24';
+const APP_VERSION_HTML = '2026.09.14.25';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -6043,7 +6043,14 @@ function doGet(e) {
       var lrDate = e.parameter.date || '';
       var lrReason = e.parameter.reason || '（未入力）';
       var lrSubject = 'DSBZ給与：有給申請';
-      var lrBody = lrEmpName + 'さんから有給申請が届きました。' + lrDate + '。理由：' + lrReason + 'のため。内容を確認し、アプリより、有給許可を行ってください。\\n※本メールはDSBZ給与より自動送信されています。';
+      var lrDivider = '■■■■■■■■■■■■■■■■■■■■';
+      var lrBody = lrEmpName + 'さんから有給申請が届きました。\\n\\n\\n'
+        + lrDivider + '\\n\\n'
+        + lrDate + '\\n\\n'
+        + '理由：' + lrReason + 'のため。\\n\\n'
+        + lrDivider + '\\n\\n'
+        + '内容を確認し、アプリより、有給許可を行ってください。\\n'
+        + '※本メールはDSBZ給与より自動送信されています。';
       MailApp.sendEmail(getLeaveTypeEmail(), lrSubject, lrBody);
       out = {success: true};
     } else if (action === 'sendCommutePassRequest') {

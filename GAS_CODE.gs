@@ -870,7 +870,14 @@ function doGet(e) {
       var lrDate = e.parameter.date || '';
       var lrReason = e.parameter.reason || '（未入力）';
       var lrSubject = 'DSBZ給与：有給申請';
-      var lrBody = lrEmpName + 'さんから有給申請が届きました。' + lrDate + '。理由：' + lrReason + 'のため。内容を確認し、アプリより、有給許可を行ってください。\n※本メールはDSBZ給与より自動送信されています。';
+      var lrDivider = '■■■■■■■■■■■■■■■■■■■■';
+      var lrBody = lrEmpName + 'さんから有給申請が届きました。\n\n\n'
+        + lrDivider + '\n\n'
+        + lrDate + '\n\n'
+        + '理由：' + lrReason + 'のため。\n\n'
+        + lrDivider + '\n\n'
+        + '内容を確認し、アプリより、有給許可を行ってください。\n'
+        + '※本メールはDSBZ給与より自動送信されています。';
       MailApp.sendEmail(getLeaveTypeEmail(), lrSubject, lrBody);
       out = {success: true};
     } else if (action === 'sendCommutePassRequest') {
