@@ -524,6 +524,12 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
   <span class="fs-10">開く ›</span>
 </div>
 
+<div class="news-banner" id="sync-warning-banner" style="display:none;background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);">
+  <span class="dot" style="background:var(--danger);"></span>
+  <span class="flex-1">実績データの取得に失敗しました。表示が古い可能性があります。</span>
+  <span class="fs-10">再試行 ›</span>
+</div>
+
 <div class="modal-overlay hidden" id="news-modal">
   <div class="modal-sheet modal-sheet-80vh">
     <header id="news-modal-header">
@@ -1900,7 +1906,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.12';
+const APP_VERSION_HTML = '2026.09.14.13';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2202,6 +2208,10 @@ function refreshNewsViewsAfterReadChange(){
 }
 
 document.getElementById('news-banner').addEventListener('click', ()=>refreshNewsThenShowModal(true));
+document.getElementById('sync-warning-banner').addEventListener('click', ()=>{
+  showSyncWarningBanner(false);
+  pullSettingsFromDrive();
+});
 document.getElementById('btn-news-show-all').addEventListener('click', ()=>refreshNewsThenShowModal(false));
 document.getElementById('news-modal-close').addEventListener('click', ()=>{
   document.getElementById('news-modal').classList.add('hidden');
@@ -8630,16 +8640,34 @@ function dedupeLeaveLog(){
   });
   if(leave.log.length !== before) saveJSON('leave', leave);
 }
-async function pullSettingsFromDrive(){
+function showSyncWarningBanner(show){
+  const el = document.getElementById('sync-warning-banner');
+  if(el) el.style.display = show ? 'flex' : 'none';
+}
+// Drive上の設定（実績データ等）の取得。今日発生したような一時的なGoogle側の不調で
+// 失敗すると、ローカルの実績データが空のままになり「未登録」に見えてしまう不具合があった。
+// 失敗時は少し待って自動的に再試行し、それでも失敗した場合だけ画面上に警告バナーを出す。
+async function pullSettingsFromDrive(retriesLeft){
   if(!settings.scriptUrl || !settings.driveFolderId) return;
+  if(retriesLeft === undefined) retriesLeft = 2;
   const status = document.getElementById('sync-status');
   const debugEl = document.getElementById('sync-debug');
   status.textContent = 'Driveから設定を取得しています…';
   try{
     const url = `${settings.scriptUrl}?action=readSettings&folder=${encodeURIComponent(settings.driveFolderId)}`;
     const data = await jsonpRequest(url);
-    if(data.error){ status.textContent = '取得失敗：' + data.error; return; }
+    if(data.error){
+      if(retriesLeft > 0){
+        status.textContent = `取得に失敗したため再試行します…（あと${retriesLeft}回）`;
+        await new Promise(r=>setTimeout(r, 2500));
+        return pullSettingsFromDrive(retriesLeft - 1);
+      }
+      status.textContent = '取得失敗：' + data.error;
+      showSyncWarningBanner(true);
+      return;
+    }
     if(!data.exists){ status.textContent = 'Drive上に設定ドキュメントはまだありません（今すぐ同期で作成されます）。'; return; }
+    showSyncWarningBanner(false);
     const parsed = parseSettingsText(data.content);
     Object.assign(settings, parsed.settings);
     saveJSON('settings', settings);
@@ -8680,7 +8708,13 @@ async function pullSettingsFromDrive(){
     renderMeisaiLists();
     status.textContent = 'Driveの設定を反映しました（' + new Date().toLocaleTimeString('ja-JP') + '）';
   }catch(e){
+    if(retriesLeft > 0){
+      status.textContent = `取得に失敗したため再試行します…（あと${retriesLeft}回）`;
+      await new Promise(r=>setTimeout(r, 2500));
+      return pullSettingsFromDrive(retriesLeft - 1);
+    }
     status.textContent = '取得に失敗しました：' + e.message;
+    showSyncWarningBanner(true);
   }
 }
 
