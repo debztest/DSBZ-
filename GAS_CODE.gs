@@ -200,13 +200,29 @@ function serializeTransportLedgerLine(r) {
   return [r.requestId, r.empId, r.empName, appliedAtB64, r.status, decidedAtB64, reasonB64, payloadB64].join(':');
 }
 
-// 指定フォルダ内の「給与明細設定値」ドキュメントを探す
+// 指定フォルダ内の「給与明細設定値」ドキュメントを探す。
+// ログインのたびに呼ばれる（readSettings）ため、findMasterSpreadsheetFile()と同様に
+// 毎回のフォルダ内名前検索を避け、一度見つけたファイルIDをスクリプトプロパティに記憶して高速化する。
 function getSettingsDocFile(folder) {
+  var props = PropertiesService.getScriptProperties();
+  var cacheKey = 'SETTINGS_DOC_' + folder.getId();
+  var cachedId = props.getProperty(cacheKey);
+  if (cachedId) {
+    try {
+      var cachedFile = DriveApp.getFileById(cachedId);
+      if (cachedFile.getMimeType() === MimeType.GOOGLE_DOCS) return cachedFile;
+    } catch (eCache) {
+      // キャッシュ先が削除・移動済みなどで開けない場合は、下の通常検索にフォールバックする
+    }
+  }
   for (var i = 0; i < SETTINGS_DOC_NAME_CANDIDATES.length; i++) {
     var it = folder.getFilesByName(SETTINGS_DOC_NAME_CANDIDATES[i]);
     while (it.hasNext()) {
       var f = it.next();
-      if (f.getMimeType() === MimeType.GOOGLE_DOCS) return f;
+      if (f.getMimeType() === MimeType.GOOGLE_DOCS) {
+        props.setProperty(cacheKey, f.getId());
+        return f;
+      }
     }
   }
   return null;
