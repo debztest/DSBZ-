@@ -1906,7 +1906,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.23';
+const APP_VERSION_HTML = '2026.09.14.24';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3215,11 +3215,15 @@ document.getElementById('btn-send-gasupdate').addEventListener('click', async ()
   }
 });
 document.getElementById('news-detail-close-x').addEventListener('click', ()=>{
-  if(currentDetailNews) markNewsRead([currentDetailNews.id]);
+  // 有給・交通費の申請で、管理者がまだ許可/不許可（または詳細確認）を行っていない場合は、
+  // ×で閉じただけでは既読にしない（許可/不許可するまで未読のままにしてほしいという要望）。
+  const isPendingRequestForAdmin = document.getElementById('news-detail-read-actions').classList.contains('is-hidden');
+  if(currentDetailNews && !isPendingRequestForAdmin) markNewsRead([currentDetailNews.id]);
   document.getElementById('news-detail-modal').classList.add('hidden');
   refreshNewsViewsAfterReadChange();
   currentDetailNews = null;
   currentLeaveRequest = null;
+  currentTransportRequest = null;
 });
 document.getElementById('news-detail-edit-icon').addEventListener('click', ()=>{
   if(!currentDetailNews) return;
