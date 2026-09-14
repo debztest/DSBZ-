@@ -31,6 +31,20 @@ function todayDateString() {
   var day = ('0' + d.getDate()).slice(-2);
   return y + '-' + m + '-' + day;
 }
+var JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+// Dateを「YYYY年M月D日（曜）　H時MM分」の形式にする（ユーザー登録通知メールなどで使用）
+function formatJapaneseDateTimeWithWeekday(date) {
+  var wd = JP_WEEKDAYS[date.getDay()];
+  var mm = ('0' + date.getMinutes()).slice(-2);
+  return date.getFullYear() + '年' + (date.getMonth() + 1) + '月' + date.getDate() + '日（' + wd + '）　' + date.getHours() + '時' + mm + '分';
+}
+// "YYYY-MM-DD"形式の日付文字列を「YYYY年M月D日」の表記にする（未入力時は空文字を返す）
+function formatJapaneseDateFromIso(iso) {
+  if (!iso) return '';
+  var parts = String(iso).split('-');
+  if (parts.length < 3) return iso;
+  return parseInt(parts[0], 10) + '年' + parseInt(parts[1], 10) + '月' + parseInt(parts[2], 10) + '日';
+}
 // システムイベントを「操作ログ」ドキュメントに1行追記する
 function logSystemEvent(eventType, detail) {
   var logDoc = getOrCreateMasterDoc('操作ログ');
@@ -99,6 +113,13 @@ var DEFAULT_GAS_UPDATE_EMAIL = 'a_aoyama@dsbz.jp';
 function getGasUpdateEmail() {
   var v = PropertiesService.getScriptProperties().getProperty('GAS_UPDATE_EMAIL');
   return v || DEFAULT_GAS_UPDATE_EMAIL;
+}
+
+var DEFAULT_USER_NOTICE_CONTACT_EMAIL = 'a_aoyama@dsbz.jp';
+// ユーザー登録・変更通知メールの「内容に誤りがある場合のお問い合わせ先」を取得する（未設定時はデフォルト値を返す）
+function getUserNoticeContactEmail() {
+  var v = PropertiesService.getScriptProperties().getProperty('USER_NOTICE_CONTACT_EMAIL');
+  return v || DEFAULT_USER_NOTICE_CONTACT_EMAIL;
 }
 
 // ============================================================
@@ -943,6 +964,16 @@ function doGet(e) {
         PropertiesService.getScriptProperties().setProperty('GAS_UPDATE_EMAIL', newGasUpdateEmail);
         out = { success: true };
       }
+    } else if (action === 'getUserNoticeContact') {
+      out = { success: true, email: getUserNoticeContactEmail() };
+    } else if (action === 'updateUserNoticeContact') {
+      var newUserNoticeEmail = (e.parameter.newEmail || '').trim();
+      if (!newUserNoticeEmail) {
+        out = { error: 'メールアドレスを入力してください' };
+      } else {
+        PropertiesService.getScriptProperties().setProperty('USER_NOTICE_CONTACT_EMAIL', newUserNoticeEmail);
+        out = { success: true };
+      }
     } else if (action === 'companySettings') {
       var ss0 = openMasterSpreadsheet();
       if (!ss0) {
@@ -1299,6 +1330,7 @@ function doGet(e) {
         var newDobC = (e.parameter.dob || '').trim();
         var newBaseSalaryC = (e.parameter.baseSalary || '0').trim();
         var newIsExecutiveC = (e.parameter.isExecutive || '0').trim();
+        var newNotifyEmailC = (e.parameter.notifyEmail || '').trim();
         if (!newIdC || !newPwC) {
           out = { error: '社員IDとパスワードを入力してください' };
         } else if (findEmployeeRowSS(ssC, newIdC)) {
@@ -1328,6 +1360,36 @@ function doGet(e) {
           appendRowAsText(ssC.getSheetByName('社員一覧'), [newRoleC, newIdC, hashPasswordSha256(newPwC), newEmpFolderC.getId(), newSeiC + newMeiC]);
           appendRowAsText(ssC.getSheetByName('ユーザー情報'), [newIdC, newSeiC, newMeiC, newSeiKanaC, newMeiKanaC, newDobC, newRoleC, newIsExecutiveC, '', '', '', '', '']);
           sortEmployeeSheetById(ssC);
+
+          if (newNotifyEmailC) {
+            try {
+              var noticeSubject = 'ＤＳＢＺ給与明細ユーザー登録完了のお知らせ';
+              var noticeBody = [
+                '登録日時：' + formatJapaneseDateTimeWithWeekday(new Date()),
+                '',
+                'ユーザーＩＤ：' + newIdC,
+                '初期ＰＡＳＳ：' + newPwC,
+                '',
+                '登録名：' + newSeiC + '　' + newMeiC,
+                'とうろくめい：' + newSeiKanaC + '　' + newMeiKanaC,
+                '',
+                '生年月日　' + formatJapaneseDateFromIso(newDobC),
+                '',
+                '',
+                '以上の内容で登録しております。',
+                '内容に誤りがある場合は、下記に記載のメールアドレス宛にご連絡ください。',
+                getUserNoticeContactEmail(),
+                '',
+                'また、DSBZ給与のアプリのインストールがお済みでない場合、以下のURLよりインストールしてください。',
+                'https://debztest.github.io/DSBZ-/%E7%B5%A6%E4%B8%8E%E6%98%8E%E7%B4%B0%E3%82%A2%E3%83%97%E3%83%AA.html',
+                '',
+                'このメールはDSBZ給与より自動配信されています。'
+              ].join('\n');
+              MailApp.sendEmail(newNotifyEmailC, noticeSubject, noticeBody);
+            } catch (mailErrC) {
+              // 通知メールの送信に失敗しても、ユーザー作成自体は成功として扱う
+            }
+          }
 
           out = { success: true, id: newIdC, folderId: newEmpFolderC.getId() };
         }
