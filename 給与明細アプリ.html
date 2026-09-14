@@ -102,6 +102,7 @@ button{font-family:'Zen Kaku Gothic New',sans-serif;cursor:pointer;}
 .btn.outline{background:var(--surface);color:var(--text);border:1px solid var(--border);}
 .contact-cat-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .daytype-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+#chart-yearly-toggle.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .btn.small{width:auto;padding:8px 14px;font-size:13px;}
 .btn.ghost{background:var(--surface-2);color:var(--accent);border:1px solid var(--accent-soft);font-weight:700;}
 .btn.ghost:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
@@ -946,7 +947,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
     <div class="two-col-right">
     <div class="card">
       <div class="section-title">給与推移（基本給＋残業代）</div>
-      <div class="row center-row-gap-10">
+      <button class="btn ghost small w-full" id="chart-yearly-toggle">1年間モード：OFF</button>
+      <div class="row center-row-gap-10 mt-8">
         <button class="btn small outline" id="chart-prev">‹ 前の月</button>
         <button class="btn small outline" id="chart-next">次の月 ›</button>
       </div>
@@ -957,7 +959,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <span class="muted legend-item"><span class="legend-dash"></span>総支給額</span>
         <span class="muted legend-item"><span class="legend-dot-money"></span>賞与</span>
       </div>
-      <p class="muted mt-8 fs-11">色が薄い月は残業時間からの推定値、濃い月は明細から入力した実績です。同じ月に給与と賞与の両方がある場合は横に並べて表示します。縦の目盛りは5万円ごとです。</p>
+      <p class="muted mt-8 fs-11" id="salary-chart-note">色が薄い月は残業時間からの推定値、濃い月は明細から入力した実績です。同じ月に給与と賞与の両方がある場合は横に並べて表示します。縦の目盛りは5万円ごとです。</p>
     </div>
     <div class="card">
       <div class="section-title">明細の実績を手入力</div>
@@ -1906,7 +1908,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.18';
+const APP_VERSION_HTML = '2026.09.14.19';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -9459,13 +9461,66 @@ function formatYen(v){
 // しまう不具合があった。相対オフセットならentries配列の長さが変わっても「最新」の位置は0のまま
 // 正しく保たれる。
 let chartEndOffset = 0;
+let chartYearlyMode = false;
 const CHART_WINDOW = 6;
+const CHART_WINDOW_YEARS = 6;
 let salaryChartDetails = [];
+// 月ごとのentries（renderSalaryChart内で組み立てるもの）を年単位に集計し直す。
+// 1年間モードでは、同じ見た目のグラフ（棒・破線・ツールチップ）をそのまま使い回すため、
+// 「その年の給与」「その年の賞与」をそれぞれ1本にまとめたsalaries/bonuses配列を持つ
+// entryを年ごとに1件作る（月ごとのentryと同じ形にしておくことで、以降の描画コードを共用できる）。
+function buildYearlyEntries(monthlyEntries, settingsBase){
+  const byYear = {};
+  const order = [];
+  monthlyEntries.forEach(e=>{
+    if(!byYear[e.y]){
+      byYear[e.y] = { y: e.y, m: null, salBase:0, salOt:0, salTotal:0, salNet:0, hasSalary:false, anyEstimate:false,
+        bonusTotal:0, bonusNet:0, hasBonus:false };
+      order.push(e.y);
+    }
+    const agg = byYear[e.y];
+    e.salaries.forEach(s=>{
+      agg.hasSalary = true;
+      agg.salBase += s.base||0;
+      agg.salOt += s.otPay||0;
+      agg.salTotal += s.total||0;
+      agg.salNet += (s.net!==undefined && s.net!==null) ? s.net : (s.total||0);
+      if(s.isEstimate) agg.anyEstimate = true;
+    });
+    e.bonuses.forEach(b=>{
+      agg.hasBonus = true;
+      agg.bonusTotal += b.total||0;
+      agg.bonusNet += (b.net!==undefined && b.net!==null) ? b.net : (b.total||0);
+    });
+  });
+  order.sort((a,b)=>a-b);
+  return order.map(y=>{
+    const agg = byYear[y];
+    const salaries = agg.hasSalary ? [{ base:agg.salBase, otPay:agg.salOt, total:agg.salTotal, net:agg.salNet, isEstimate:agg.anyEstimate, payKey:null }] : [];
+    const bonuses = agg.hasBonus ? [{ total:agg.bonusTotal, net:agg.bonusNet, payKey:null }] : [];
+    return { y, m:null, key:String(y), salaries, bonuses, isGap: salaries.length===0 && bonuses.length===0, gapBase: settingsBase*12 };
+  });
+}
+document.getElementById('chart-yearly-toggle').addEventListener('click', ()=>{
+  chartYearlyMode = !chartYearlyMode;
+  chartEndOffset = 0;
+  document.getElementById('chart-yearly-toggle').textContent = chartYearlyMode ? '1年間モード：ON' : '1年間モード：OFF';
+  document.getElementById('chart-yearly-toggle').classList.toggle('active', chartYearlyMode);
+  document.getElementById('chart-prev').textContent = chartYearlyMode ? '‹ 前の年' : '‹ 前の月';
+  document.getElementById('chart-next').textContent = chartYearlyMode ? '次の年 ›' : '次の月 ›';
+  renderSalaryChart();
+});
 function renderSalaryChart(){
   const container = document.getElementById('salary-chart');
   const settingsBase = settings.baseSalary || 0;
   const std = settings.standardHours || 0;
   const rate = settings.otRate || 1.25;
+  const noteEl = document.getElementById('salary-chart-note');
+  if(noteEl){
+    noteEl.textContent = chartYearlyMode
+      ? '色が薄い年は残業時間からの推定を含む見込み、濃い年は明細から入力した実績です。同じ年に給与と賞与の両方がある場合は横に並べて表示します。縦の目盛りは50万円ごとです。'
+      : '色が薄い月は残業時間からの推定値、濃い月は明細から入力した実績です。同じ月に給与と賞与の両方がある場合は横に並べて表示します。縦の目盛りは5万円ごとです。';
+  }
 
   const hasAnyData = Object.keys(otHoursByMonth).length>0 || Object.keys(payHistory).length>0;
   if(!hasAnyData || (!settingsBase && Object.keys(payHistory).length===0)){
@@ -9490,7 +9545,10 @@ function renderSalaryChart(){
   let rangeEnd = rawRange.length ? rawRange[rawRange.length-1] : {y:today.getFullYear(), mo:today.getMonth()+1};
   const todayKey = today.getFullYear()*12 + (today.getMonth()+1);
   if(rangeEnd.y*12+rangeEnd.mo < todayKey){ rangeEnd = {y:today.getFullYear(), mo:today.getMonth()+1}; }
-  while((rangeEnd.y*12+rangeEnd.mo) - (rangeStart.y*12+rangeStart.mo) + 1 < CHART_WINDOW){
+  // 1年間モードでは、後で年単位に集計し直すため、下敷きとなる月の範囲もCHART_WINDOW_YEARS年分
+  // 確保しておく（そうしないと、ページングできる年の数が実データの範囲に縛られてしまう）。
+  const minMonths = chartYearlyMode ? CHART_WINDOW_YEARS*12 : CHART_WINDOW;
+  while((rangeEnd.y*12+rangeEnd.mo) - (rangeStart.y*12+rangeStart.mo) + 1 < minMonths){
     let mo = rangeStart.mo - 1, y = rangeStart.y;
     if(mo < 1){ mo = 12; y--; }
     rangeStart = {y, mo};
@@ -9498,7 +9556,7 @@ function renderSalaryChart(){
   const fullRange = getFullMonthRange([rangeStart, rangeEnd]);
   // 同月に複数の実績（明細①②…）がある場合は、合算せず別々の棒として保持する
   // （賞与月で既に複数棒を表示している仕組みを、通常の給与実績にも広げる）。
-  const entries = fullRange.map(({y,mo:m})=>{
+  let entries = fullRange.map(({y,mo:m})=>{
     const k = `${y}-${String(m).padStart(2,'0')}`;
     const matchingKeys = Object.keys(payHistory).filter(pk => pk === k || pk.startsWith(k+'#')).sort();
     let salaries = matchingKeys.filter(pk => payHistory[pk].salary).map(pk => Object.assign({isEstimate:false, payKey:pk}, payHistory[pk].salary));
@@ -9511,12 +9569,14 @@ function renderSalaryChart(){
     const isGap = salaries.length===0 && bonuses.length===0;
     return {y, m, key:k, salaries, bonuses, isGap, gapBase: settingsBase};
   });
+  if(chartYearlyMode) entries = buildYearlyEntries(entries, settingsBase);
 
-  const maxOffset = Math.max(0, entries.length - CHART_WINDOW);
+  const windowSize = chartYearlyMode ? CHART_WINDOW_YEARS : CHART_WINDOW;
+  const maxOffset = Math.max(0, entries.length - windowSize);
   if(chartEndOffset < 0) chartEndOffset = 0;
   if(chartEndOffset > maxOffset) chartEndOffset = maxOffset;
   const windowEnd = entries.length - chartEndOffset;
-  const windowStart = Math.max(0, windowEnd - CHART_WINDOW);
+  const windowStart = Math.max(0, windowEnd - windowSize);
   const recent = entries.slice(windowStart, windowEnd);
   document.getElementById('chart-prev').style.visibility = windowStart > 0 ? 'visible' : 'hidden';
   document.getElementById('chart-next').style.visibility = chartEndOffset > 0 ? 'visible' : 'hidden';
@@ -9528,7 +9588,7 @@ function renderSalaryChart(){
     if(e.isGap) v = Math.max(v, e.gapBase);
     return v;
   }), 1);
-  const GRID_STEP = 50000;
+  const GRID_STEP = chartYearlyMode ? 500000 : 50000;
   const maxVal = Math.ceil(maxRaw / GRID_STEP) * GRID_STEP || GRID_STEP;
 
   const W = 320, H = 196, padBottom = 28, padTop = 14, padLeft = 30;
@@ -9558,12 +9618,13 @@ function renderSalaryChart(){
   salaryChartDetails = [];
   recent.forEach((e, mi)=>{
     const slotX = e.slotX, barW = e.slotW;
-    const monthLabel = `${e.m}月`;
+    const monthLabel = chartYearlyMode ? `${e.y}年` : `${e.m}月`;
     const subCount = e.salaries.length + e.bonuses.length;
 
     if(e.isGap){
       const baseY = H - padBottom - scale(e.gapBase);
-      svg += `<line x1="${slotX}" y1="${baseY}" x2="${slotX+barW}" y2="${baseY}" style="stroke:#3B6FD6;stroke-width:1.5;stroke-dasharray:4,3;opacity:0.8;"><title>${monthLabel}\nこの月の記録がありません</title></line>`;
+      const gapNote = chartYearlyMode ? 'この年の記録がありません' : 'この月の記録がありません';
+      svg += `<line x1="${slotX}" y1="${baseY}" x2="${slotX+barW}" y2="${baseY}" style="stroke:#3B6FD6;stroke-width:1.5;stroke-dasharray:4,3;opacity:0.8;"><title>${monthLabel}\n${gapNote}</title></line>`;
     }else{
       const subGap = subCount > 1 ? 3 : 0;
       const subW = (barW - subGap*(subCount-1)) / Math.max(1,subCount);
@@ -9577,7 +9638,7 @@ function renderSalaryChart(){
         const detailIdx = salaryChartDetails.length;
         salaryChartDetails.push({
           type: 'salary',
-          label: e.salaries.length>1 ? `${e.y}年${e.m}月度${CIRCLED_NUMS[si]||('('+(si+1)+')')}` : `${e.y}年${e.m}月度`,
+          label: chartYearlyMode ? `${e.y}年 合計` : (e.salaries.length>1 ? `${e.y}年${e.m}月度${CIRCLED_NUMS[si]||('('+(si+1)+')')}` : `${e.y}年${e.m}月度`),
           base: sal.base, otPay: sal.otPay, total: sal.total, net: sal.net, isEstimate: sal.isEstimate, payKey: sal.payKey
         });
         svg += `<g class="chart-bar-group" data-detail-idx="${detailIdx}" style="cursor:pointer;">`;
@@ -9593,7 +9654,7 @@ function renderSalaryChart(){
         const h = scale(b.net);
         const yTop = H - padBottom - h;
         const detailIdx = salaryChartDetails.length;
-        salaryChartDetails.push({ type:'bonus', label: `${e.y}年${e.m}月度賞与`, bonusTotal: b.total, bonusNet: b.net, payKey: b.payKey });
+        salaryChartDetails.push({ type:'bonus', label: chartYearlyMode ? `${e.y}年 賞与合計` : `${e.y}年${e.m}月度賞与`, bonusTotal: b.total, bonusNet: b.net, payKey: b.payKey });
         svg += `<g class="chart-bar-group" data-detail-idx="${detailIdx}" style="cursor:pointer;">`;
         svg += `<rect x="${sx}" y="${padTop}" width="${subW}" height="${H-padTop-padBottom}" fill="transparent"/>`;
         svg += `<rect x="${sx}" y="${yTop}" width="${subW}" height="${h}" rx="2" style="fill:var(--money);"><title>${monthLabel}賞与\n差引支給額：${formatYen(b.net)}</title></rect>`;
@@ -9605,7 +9666,7 @@ function renderSalaryChart(){
     }
     const labelColor = e.isGap ? '#D64545' : 'var(--text-2)';
     svg += `<text x="${slotX+barW/2}" y="${H-14}" text-anchor="middle" font-size="10" style="fill:${labelColor};font-weight:${e.isGap?700:400};">${monthLabel}</text>`;
-    if(mi===0 || e.m===1){
+    if(!chartYearlyMode && (mi===0 || e.m===1)){
       svg += `<text x="${slotX+barW/2}" y="${H-4}" text-anchor="middle" font-size="8" style="fill:var(--text-3);">${e.y}年</text>`;
     }
   });
