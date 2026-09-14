@@ -1906,7 +1906,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.15';
+const APP_VERSION_HTML = '2026.09.14.16';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -3095,7 +3095,14 @@ function showSplash(){
   }, 900);
 }
 document.getElementById('btn-employee-logout').addEventListener('click', async ()=>{
-  if(!(await showConfirmModal('ログアウトしますか？'))) return;
+  // documentsに残っているのは、まだDriveへの同期が確認できていない明細（アップロード失敗時の
+  // 保険として端末に残しているもの）。これに気づかずログアウト（別ユーザーでの再ログイン含む）
+  // すると、次回ログイン時のリセット処理でこの一覧が無条件に消え、画面から見えなくなってしまう
+  // （実体は端末内に残るが、二度とアクセスできなくなる）ため、事前に警告する。
+  const pendingMsg = documents.length > 0
+    ? `まだDriveへの同期が完了していない明細が${documents.length}件あります。ログアウトすると、それらの明細が見えなくなります。先に「Drive更新」などで同期を確認することをおすすめします。それでもログアウトしますか？`
+    : 'ログアウトしますか？';
+  if(!(await showConfirmModal(pendingMsg))) return;
   settings.driveFolderId = '';
   currentEmployeeId = null;
   currentEmployeeName = null;
