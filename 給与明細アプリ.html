@@ -1353,11 +1353,6 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <div class="divider-16"></div>
         <div class="section-title fs-13">有給残日数の修正</div>
         <div id="admin-leave-years"></div>
-        <div class="row action-row-gap">
-          <input class="flex-1" type="number" id="admin-leave-new-year" placeholder="年（例：2026）">
-          <input class="flex-1" type="number" id="admin-leave-new-value" placeholder="日数">
-        </div>
-        <button class="btn ghost small mt-6 w-full" id="btn-admin-add-leave-year">この年を追加・保存</button>
         <p class="muted mt-6" id="admin-leave-status"></p>
         <div class="divider-16"></div>
         <div class="section-title fs-13">次回有給付与日を個別に変更</div>
@@ -1911,7 +1906,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.22';
+const APP_VERSION_HTML = '2026.09.14.23';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -4259,28 +4254,6 @@ document.getElementById('btn-admin-save-userinfo').addEventListener('click', asy
     if(data.error){ status.textContent = data.error; return; }
     status.textContent = '保存しました。';
     logEvent('admin_change', `${adminFoundUserId}のユーザー情報を変更`);
-  }catch(e){
-    status.textContent = '保存に失敗しました：' + e.message;
-  }
-});
-
-document.getElementById('btn-admin-add-leave-year').addEventListener('click', async ()=>{
-  const status = document.getElementById('admin-leave-status');
-  if(!adminFoundUserId){ status.textContent = '先に検索してください。'; return; }
-  const year = document.getElementById('admin-leave-new-year').value.trim();
-  const value = document.getElementById('admin-leave-new-value').value.trim();
-  if(!year || !value){ status.textContent = '年と日数を入力してください。'; return; }
-  status.textContent = '保存しています…';
-  try{
-    const url = `${COMPANY_SCRIPT_URL}?action=adminUpdateLeaveBalance&targetId=${encodeURIComponent(adminFoundUserId)}&year=${encodeURIComponent(year)}&newValue=${encodeURIComponent(value)}`;
-    const data = await jsonpRequest(url);
-    if(data.error){ status.textContent = data.error; return; }
-    adminFoundByYear[year] = value;
-    renderAdminLeaveYears();
-    document.getElementById('admin-leave-new-year').value = '';
-    document.getElementById('admin-leave-new-value').value = '';
-    status.textContent = `${year}年分を保存しました。`;
-    logEvent('admin_change', `${adminFoundUserId}の${year}年有給残を${value}に設定`);
   }catch(e){
     status.textContent = '保存に失敗しました：' + e.message;
   }
