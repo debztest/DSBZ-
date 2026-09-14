@@ -1911,7 +1911,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.21';
+const APP_VERSION_HTML = '2026.09.14.22';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -9061,15 +9061,17 @@ function renderLeave(){
   });
 }
 
-async function notifyLeaveRequest(type, requestId, dateStr, delta, note){
-  const empLabel = currentEmployeeId ? `${currentEmployeeId}:${currentEmployeeName||''}` : '';
+async function notifyLeaveRequest(type, requestId, dateStr, delta, note, empId, empName){
+  if(empId === undefined) empId = currentEmployeeId;
+  if(empName === undefined) empName = currentEmployeeName;
+  const empLabel = empId ? `${empId}:${empName||''}` : '';
   const typeLabel = type === 'delete' ? '有給削除申請' : '有給使用申請';
-  const payload = b64EncodeUnicode(JSON.stringify({requestId, type, empId: currentEmployeeId, empName: currentEmployeeName||'', date: dateStr, delta, note: note||''}));
+  const payload = b64EncodeUnicode(JSON.stringify({requestId, type, empId: empId||null, empName: empName||'', date: dateStr, delta, note: note||''}));
   try{
     await jsonpRequest(`${COMPANY_SCRIPT_URL}?action=postNews&scope=admin&priority=critical&title=${encodeURIComponent(typeLabel)}&message=${encodeURIComponent(LEAVE_REQUEST_MARKER+payload)}`);
   }catch(e){ /* 通知失敗は無視 */ }
   try{
-    await jsonpRequest(`${COMPANY_SCRIPT_URL}?action=sendLeaveRequestEmail&empName=${encodeURIComponent(currentEmployeeName||empLabel)}&date=${encodeURIComponent(isoToDisplay(dateStr))}&reason=${encodeURIComponent(note||'')}`);
+    await jsonpRequest(`${COMPANY_SCRIPT_URL}?action=sendLeaveRequestEmail&empName=${encodeURIComponent(empName||empLabel)}&date=${encodeURIComponent(isoToDisplay(dateStr))}&reason=${encodeURIComponent(note||'')}`);
   }catch(e){ /* 通知失敗は無視 */ }
 }
 async function deleteLeaveEntry(item){
@@ -9079,6 +9081,7 @@ async function deleteLeaveEntry(item){
     return;
   }
   if(!currentIsAdmin){
+    const reqEmpId = currentEmployeeId, reqEmpName = currentEmployeeName;
     if(!(await showConfirmModal(`「${item.note||(item.delta>0?'付与':'使用')}」（${isoToDisplay(item.date)}・${item.delta>0?'+':''}${item.delta}日）の削除申請を行いますか？`))) return;
     const requestId = genRequestId();
     const originalNote = item.note || '';
@@ -9090,7 +9093,7 @@ async function deleteLeaveEntry(item){
       if(!ok) await showAlertModal('Driveへの反映に失敗しました。設定タブの同期状況を確認してください。');
     }
     logEvent('leave_delete_request', `${isoToDisplay(item.date)}・${item.delta>0?'+':''}${item.delta}日・${originalNote}`);
-    await notifyLeaveRequest('delete', requestId, item.date, item.delta, originalNote);
+    await notifyLeaveRequest('delete', requestId, item.date, item.delta, originalNote, reqEmpId, reqEmpName);
     return;
   }
   if(!(await showConfirmModal(`「${item.note||(item.delta>0?'付与':'使用')}」（${isoToDisplay(item.date)}・${item.delta>0?'+':''}${item.delta}日）を削除しますか？`))) return;
@@ -9129,6 +9132,7 @@ document.querySelectorAll('#view-yukyu .daytype-btn').forEach(btn=>{
   });
 });
 async function applyLeave(){
+  const reqEmpId = currentEmployeeId, reqEmpName = currentEmployeeName;
   const days = yukyuDayType;
   const dateInput = document.getElementById('yukyu-input-date').value;
   if(!dateInput){
@@ -9166,7 +9170,7 @@ async function applyLeave(){
     }
     if(isPendingUse){
       logEvent('leave_use_request', `${days}日 ${note}`);
-      await notifyLeaveRequest('use', requestId, dateStr, -days, note);
+      await notifyLeaveRequest('use', requestId, dateStr, -days, note, reqEmpId, reqEmpName);
       await showAlertModal('申請しました。管理者の承認をお待ちください。');
     }else{
       logEvent('leave_use', `${days}日 ${note}`);
@@ -9228,6 +9232,7 @@ document.getElementById('leave-range-close').addEventListener('click', ()=>{
   document.getElementById('leave-range-modal').classList.add('hidden');
 });
 document.getElementById('leave-range-submit').addEventListener('click', async ()=>{
+  const reqEmpId = currentEmployeeId, reqEmpName = currentEmployeeName;
   const status = document.getElementById('leave-range-status');
   const start = document.getElementById('leave-range-start').value;
   const end = document.getElementById('leave-range-end').value;
@@ -9266,7 +9271,7 @@ document.getElementById('leave-range-submit').addEventListener('click', async ()
     document.getElementById('leave-range-modal').classList.add('hidden');
     if(isPendingUse){
       logEvent('leave_use_request', `${days}日 ${noteText}`);
-      await notifyLeaveRequest('use', requestId, start, -days, noteText);
+      await notifyLeaveRequest('use', requestId, start, -days, noteText, reqEmpId, reqEmpName);
       await showAlertModal('申請しました。管理者の承認をお待ちください。');
     }else{
       logEvent('leave_use', `${days}日 ${noteText}`);
