@@ -276,6 +276,7 @@ nav.tabbar button svg{width:20px;height:20px;}
 .legend-dot-danger{width:10px!important;height:10px!important;border-radius:3px!important;background:#D64545!important;display:inline-block!important;}
 .legend-dot-money{width:10px!important;height:10px!important;border-radius:3px!important;background:var(--money)!important;display:inline-block!important;}
 .legend-dash{width:14px!important;height:0!important;border-top:2px dashed var(--text)!important;display:inline-block!important;}
+.legend-line-ot{width:14px!important;height:0!important;border-top:2px solid #1F8A6B!important;display:inline-block!important;}
 .pdf-frame{width:100%!important;min-height:50vh!important;background:#3a3a38!important;padding:8px!important;box-sizing:border-box!important;overflow:auto!important;}
 #modal-viewer-rotate-wrap{transition:transform .25s ease;transform-origin:center center;}
 .news-icon-badge{background:rgba(255,255,255,0.2)!important;border:none!important;color:#fff!important;width:38px!important;height:38px!important;border-radius:50%!important;display:flex!important;align-items:center!important;justify-content:center!important;flex-shrink:0!important;margin-top:2px!important;}
@@ -961,8 +962,9 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <span class="muted legend-item"><span class="legend-dot-danger"></span>残業代</span>
         <span class="muted legend-item"><span class="legend-dash"></span>総支給額</span>
         <span class="muted legend-item"><span class="legend-dot-money"></span>賞与</span>
+        <span class="muted legend-item"><span class="legend-line-ot"></span>残業時間（右の目盛り）</span>
       </div>
-      <p class="muted mt-8 fs-11" id="salary-chart-note">色が薄い月は残業時間からの推定値、濃い月は明細から入力した実績です。同じ月に給与と賞与の両方がある場合は横に並べて表示します。縦の目盛りは5万円ごとです。</p>
+      <p class="muted mt-8 fs-11" id="salary-chart-note">色が薄い月は残業時間からの推定値、濃い月は明細から入力した実績です。同じ月に給与と賞与の両方がある場合は横に並べて表示します。縦の目盛りは5万円ごとです。緑の折れ線は残業時間で、未入力の月は線が途切れます。</p>
     </div>
     <div class="card">
       <div class="section-title">明細の実績を手入力</div>
@@ -1906,7 +1908,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.09.14.25';
+const APP_VERSION_HTML = '2026.10.28.1';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -9553,7 +9555,18 @@ function renderSalaryChart(){
   const GRID_STEP = 50000;
   const maxVal = Math.ceil(maxRaw / GRID_STEP) * GRID_STEP || GRID_STEP;
 
+  // 残業時間の折れ線用データ（入力済みの月だけ。未入力の月は線を途切れさせる）。
+  const otTotals = recent.map(e=>{
+    const oe = getOtEntry(e.key);
+    return oe === undefined ? null : otEntryTotal(oe);
+  });
+  const hasOtLine = otTotals.some(v=>v!==null);
+  const otMaxRaw = Math.max(...otTotals.filter(v=>v!==null), 0);
+  const OT_STEP = otMaxRaw <= 20 ? 5 : (otMaxRaw <= 60 ? 10 : 20);
+  const otMaxVal = Math.max(OT_STEP, Math.ceil(otMaxRaw / OT_STEP) * OT_STEP);
+
   const H = 196, padBottom = 28, padTop = 14, padLeft = 30;
+  const padRight = hasOtLine ? 30 : 6;
   const gapX = 12;
   const MIN_UNIT_W = 14;
   // 棒が増えた月は、最大3ヶ月分ぶんの幅まで広げてよい。
@@ -9564,8 +9577,8 @@ function renderSalaryChart(){
   // 見切れたりしないようにする）。
   const baseW = 320;
   const neededPlotW = MIN_UNIT_W*totalUnits + gapX*(recent.length+1);
-  const plotW = Math.max(baseW - padLeft - 6, neededPlotW);
-  const W = plotW + padLeft + 6;
+  const plotW = Math.max(baseW - padLeft - padRight, neededPlotW);
+  const W = plotW + padLeft + padRight;
   const unitW = (plotW - gapX*(recent.length+1)) / totalUnits;
   let cursorX = padLeft + gapX;
   recent.forEach(e=>{
@@ -9579,10 +9592,16 @@ function renderSalaryChart(){
 
   for(let g=GRID_STEP; g<=maxVal; g+=GRID_STEP){
     const gy = H - padBottom - scale(g);
-    svg += `<line x1="${padLeft}" y1="${gy}" x2="${W-4}" y2="${gy}" style="stroke:var(--border);stroke-width:1;"/>`;
+    svg += `<line x1="${padLeft}" y1="${gy}" x2="${W-padRight+2}" y2="${gy}" style="stroke:var(--border);stroke-width:1;"/>`;
     svg += `<text x="${padLeft-4}" y="${gy+3}" text-anchor="end" font-size="8" style="fill:var(--text-3);">${Math.round(g/10000)}万</text>`;
   }
-  svg += `<line x1="${padLeft}" y1="${H-padBottom}" x2="${W-4}" y2="${H-padBottom}" style="stroke:var(--border);stroke-width:1;"/>`;
+  svg += `<line x1="${padLeft}" y1="${H-padBottom}" x2="${W-padRight+2}" y2="${H-padBottom}" style="stroke:var(--border);stroke-width:1;"/>`;
+  if(hasOtLine){
+    for(let h=OT_STEP; h<=otMaxVal; h+=OT_STEP){
+      const hy = H - padBottom - (h/otMaxVal)*(H-padBottom-padTop);
+      svg += `<text x="${W-padRight+5}" y="${hy+3}" text-anchor="start" font-size="8" style="fill:#1F8A6B;">${h}h</text>`;
+    }
+  }
 
   salaryChartDetails = [];
   recent.forEach((e, mi)=>{
@@ -9607,7 +9626,8 @@ function renderSalaryChart(){
         salaryChartDetails.push({
           type: 'salary',
           label: e.salaries.length>1 ? `${e.y}年${e.m}月度${CIRCLED_NUMS[si]||('('+(si+1)+')')}` : `${e.y}年${e.m}月度`,
-          base: sal.base, otPay: sal.otPay, total: sal.total, net: sal.net, isEstimate: sal.isEstimate, payKey: sal.payKey
+          base: sal.base, otPay: sal.otPay, total: sal.total, net: sal.net, isEstimate: sal.isEstimate, payKey: sal.payKey,
+          otHours: otTotals[mi], otNight: (getOtEntry(e.key)||{}).night || 0
         });
         svg += `<g class="chart-bar-group" data-detail-idx="${detailIdx}" style="cursor:pointer;">`;
         svg += `<rect x="${sx}" y="${padTop}" width="${subW}" height="${H-padTop-padBottom}" fill="transparent"/>`;
@@ -9638,6 +9658,29 @@ function renderSalaryChart(){
       svg += `<text x="${slotX+barW/2}" y="${H-4}" text-anchor="middle" font-size="8" style="fill:var(--text-3);">${e.y}年</text>`;
     }
   });
+  if(hasOtLine){
+    const otPts = recent.map((e, i)=>{
+      if(otTotals[i] === null) return null;
+      return {
+        x: e.slotX + e.slotW/2,
+        y: H - padBottom - (otTotals[i]/otMaxVal)*(H-padBottom-padTop),
+        hours: otTotals[i], label: `${e.m}月`
+      };
+    });
+    let seg = [];
+    const flushSeg = ()=>{
+      if(seg.length > 1){
+        svg += `<polyline points="${seg.map(p=>`${p.x},${p.y}`).join(' ')}" fill="none" style="stroke:#1F8A6B;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;pointer-events:none;"/>`;
+      }
+      seg = [];
+    };
+    otPts.forEach(p=>{ if(p === null) flushSeg(); else seg.push(p); });
+    flushSeg();
+    otPts.forEach(p=>{
+      if(p === null) return;
+      svg += `<circle cx="${p.x}" cy="${p.y}" r="2.6" style="fill:#fff;stroke:#1F8A6B;stroke-width:1.6;pointer-events:none;"/>`;
+    });
+  }
   svg += '</svg>';
   container.innerHTML = svg;
 }
@@ -9654,6 +9697,7 @@ document.getElementById('salary-chart').addEventListener('click', (ev)=>{
     rowsEl.innerHTML = `
       <div class="row mt-8"><span class="muted">基本給</span><span class="mono">${formatYen(detail.base)}</span></div>
       <div class="row mt-8"><span class="muted">残業代</span><span class="mono">${formatYen(detail.otPay)}</span></div>
+      ${detail.otHours !== null && detail.otHours !== undefined ? `<div class="row mt-8"><span class="muted">残業時間</span><span class="mono">${detail.otHours}時間${detail.otNight ? `（うち深夜${detail.otNight}時間）` : ''}</span></div>` : ''}
       <div class="row mt-8"><span class="muted">総支給額</span><span class="mono">${formatYen(detail.total)}</span></div>
       <div class="row mt-8"><span class="muted">差引支給額</span><span class="mono" style="font-weight:700;">${formatYen(detail.net !== undefined && detail.net !== null ? detail.net : detail.total)}</span></div>
       ${detail.isEstimate ? '<p class="muted mt-8" style="font-size:11px;">※実績未登録のため、設定値からの見込み額です。</p>' : ''}
