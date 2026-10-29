@@ -1908,7 +1908,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.10.29.1';
+const APP_VERSION_HTML = '2026.10.29.2';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -8891,6 +8891,26 @@ document.querySelectorAll('.man-amount').forEach(input=>{
 });
 setupManualEntryForm('man-');
 setupManualEntryForm('modal-man-');
+
+// 手入力フォームで年月・種別を選んだら、その月に登録済みの金額を各欄へ自動で入れる
+// （未登録の月は欄を空にする）。種別はユーザーが選んだものを変えない。
+function autofillManualEntryForm(prefix){
+  const el = id => document.getElementById(prefix+id);
+  const ym = el('month').value;
+  const isBonus = el('type').value === 'bonus';
+  const rec = ym ? payHistory[ym] : null;
+  const fmt = v => (v === undefined || v === null) ? '' : Number(v).toLocaleString('en-US');
+  const part = rec ? (isBonus ? rec.bonus : rec.salary) : null;
+  el('base').value = part && !isBonus ? fmt(part.base) : '';
+  el('otpay').value = part && !isBonus ? fmt(part.otPay) : '';
+  el('bonus').value = part && isBonus ? fmt(part.total) : '';
+  el('total').value = part ? fmt(part.total) : '';
+  el('net').value = part ? fmt(part.net !== undefined ? part.net : part.total) : '';
+  const label = isBonus ? '賞与' : '給与';
+  el('status').textContent = part ? `${ym} の登録済みの${label}を表示しています。` : '';
+}
+document.getElementById('man-month').addEventListener('change', ()=>autofillManualEntryForm('man-'));
+document.getElementById('man-type').addEventListener('change', ()=>autofillManualEntryForm('man-'));
 
 function fillManualEntryForm(prefix, ym, doc, payKey){
   const el = id => document.getElementById(prefix+id);
