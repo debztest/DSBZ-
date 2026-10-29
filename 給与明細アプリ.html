@@ -57,7 +57,8 @@ body{min-height:100vh;display:flex;justify-content:center;}
 .login-card p.sub{font-size:12px;color:var(--text-2);text-align:center;margin:0 0 24px;}
 header.top{padding:24px 20px 16px;background:var(--accent);color:#fff;border-radius:0 0 18px 18px;}
 header.top h1{font-size:20px;font-weight:700;margin:0;letter-spacing:.01em;color:#fff;}
-header.top #header-sub{color:rgba(255,255,255,0.8);}
+header.top #header-sub, header.top #header-lastlogin{color:rgba(255,255,255,0.8);}
+header.top #header-lastlogin{margin-top:2px;}
 header.top p{margin:4px 0 0;font-size:12px;color:var(--text-2);}
 main{flex:1;padding:16px 16px 96px;overflow-y:auto;}
 /* 文字サイズ（小・中・大）：mainの中身全体をzoomで拡大縮小する。
@@ -512,6 +513,7 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       </div>
     </div>
     <p id="header-sub">明細・有給・残業を一つにまとめて管理</p>
+    <p id="header-lastlogin"></p>
   </div>
   <div class="row-noshrink-8">
   <button class="news-icon-badge" id="btn-contact-open" title="お問い合わせ">
@@ -1908,7 +1910,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.10.29.2';
+const APP_VERSION_HTML = '2026.10.29.3';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2677,6 +2679,8 @@ function showAppAfterLogin(name, empId){
   document.getElementById('app').style.display = 'flex';
   const nameEl = document.getElementById('header-sub');
   if(nameEl) nameEl.textContent = name ? `${empId?empId+':':''}${name} がログイン中` : '明細・有給・残業を一つにまとめて管理';
+  const lastLoginEl = document.getElementById('header-lastlogin');
+  if(lastLoginEl) lastLoginEl.textContent = '';
   document.querySelector('nav.tabbar button[data-view=meisai]').click();
   resetAdminPanels();
 }
@@ -2761,6 +2765,8 @@ function resetPersonalDataForLogin(){
   settings.grantDate = '';
   settings.grantDays = undefined;
   settings.commute = undefined;
+  settings.lastLoginAt = undefined;
+  loginStampDone = false;
   saveJSON('settings', settings);
   const commuteCard = document.getElementById('card-commute-pass');
   if(commuteCard){
@@ -8513,6 +8519,9 @@ function serializeSettingsText(){
   const lines = [];
   lines.push(`Apps:${settings.scriptUrl||''}`);
   lines.push(`folderID:${settings.driveFolderId||''}`);
+  if(settings.lastLoginAt){
+    lines.push(`最終ログイン:${settings.lastLoginAt}`);
+  }
   lines.push('');
   if(settings.grantDate){
     lines.push(`有給次回付与:${settings.grantDate.replace(/-/g,'')}`);
@@ -8638,6 +8647,8 @@ function parseSettingsText(text){
     }
     if(m = line.match(/^有給次回付与:(\d{8})$/)){
       result.settings.grantDate = `${m[1].slice(0,4)}-${m[1].slice(4,6)}-${m[1].slice(6,8)}`;
+    }else if(m = line.match(/^最終ログイン:(\d+)$/)){
+      result.settings.lastLoginAt = parseInt(m[1], 10);
     }else if(m = line.match(/^付与数:([\d.]+)$/)){
       result.settings.grantDays = parseFloat(m[1]);
     }else if(m = line.match(/^給料日:(\d+)$/)){
@@ -8688,6 +8699,20 @@ function dedupeLeaveLog(){
   });
   if(leave.log.length !== before) saveJSON('leave', leave);
 }
+// ヘッダーに「前回のログイン日時」を出し、今回のログイン日時をDriveの設定へ記録する。
+// 前回の値はDrive上の設定ドキュメントに入っているため、端末が違っても同じ前回日時が出る。
+// Driveの内容を確認できた（pullSettingsFromDrive()が成功した）時点で、ログインごとに1回だけ行う。
+let loginStampDone = false;
+function recordLoginStamp(){
+  if(loginStampDone) return;
+  loginStampDone = true;
+  const prev = parseInt(settings.lastLoginAt, 10);
+  const el = document.getElementById('header-lastlogin');
+  if(el) el.textContent = prev ? `前回ログイン：${formatNewsTime(prev)}` : '前回ログイン：記録なし';
+  settings.lastLoginAt = Date.now();
+  saveJSON('settings', settings);
+  pushSettingsToDrive();
+}
 function showSyncWarningBanner(show){
   const el = document.getElementById('sync-warning-banner');
   if(el) el.style.display = show ? 'flex' : 'none';
@@ -8718,6 +8743,7 @@ async function pullSettingsFromDrive(retriesLeft){
       // ドキュメントが存在しないこと自体は「確認できた」ので、新規作成のための書き込みは許可する
       driveSettingsSynced = true;
       status.textContent = 'Drive上に設定ドキュメントはまだありません（今すぐ同期で作成されます）。';
+      recordLoginStamp();
       return;
     }
     showSyncWarningBanner(false);
@@ -8760,6 +8786,7 @@ async function pullSettingsFromDrive(retriesLeft){
     renderSummary();
     renderSalaryChart();
     renderMeisaiLists();
+    recordLoginStamp();
     status.textContent = 'Driveの設定を反映しました（' + new Date().toLocaleTimeString('ja-JP') + '）';
   }catch(e){
     if(retriesLeft > 0){
