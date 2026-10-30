@@ -844,6 +844,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <div class="row-wrap-6 mt-8">
           <button class="filter-chip" data-meisai-cat="salary">明細</button>
           <button class="filter-chip" data-meisai-cat="bonus">賞与</button>
+          <button class="filter-chip" data-meisai-cat="yearend">年末調整</button>
+          <button class="filter-chip" data-meisai-cat="raise">昇給/減給</button>
           <button class="filter-chip" data-meisai-cat="other">その他</button>
           <button class="filter-chip" data-meisai-cat="unregistered">未登録</button>
           <button class="filter-chip" data-meisai-cat="missing">紛失</button>
@@ -1408,6 +1410,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <select id="payslip-upload-category" class="mt-6">
         <option value="salary">明細</option>
         <option value="bonus">賞与</option>
+        <option value="yearend">年末調整</option>
+        <option value="raise">昇給/減給通知書</option>
       </select>
       <label class="field">③対象年月日</label>
       <div class="row" style="gap:8px;">
@@ -1681,6 +1685,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <select id="pdf-rename-category">
         <option value="salary">明細</option>
         <option value="bonus">賞与</option>
+        <option value="yearend">年末調整</option>
+        <option value="raise">昇給/減給通知書</option>
       </select>
       <label class="field">年</label>
       <input type="number" id="pdf-rename-year">
@@ -1910,7 +1916,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.10.29.3';
+const APP_VERSION_HTML = '2026.10.30.1';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -1948,6 +1954,19 @@ async function applyCustomIconIfAny(){
       });
     }
   }catch(e){ /* 取得失敗時は既定のアイコンをそのまま使う */ }
+}
+
+// 給与・賞与以外の書類の種類。明細の一覧にだけ表示し、給与タブのグラフや実績入力には関係させない。
+const SPECIAL_DOC_TYPES = {
+  yearend: { label:'年末調整', suffix:'_年末調整', color:'#2AA7DF' },
+  raise:   { label:'昇給/減給通知書', suffix:'_昇給減給通知', color:'#E8689B' }
+};
+function isSpecialDocType(t){ return !!SPECIAL_DOC_TYPES[t]; }
+function docTypeFromFilename(name){
+  if(name.includes('年末調整')) return 'yearend';
+  if(name.includes('昇給') || name.includes('減給')) return 'raise';
+  if(name.includes('賞与')) return 'bonus';
+  return 'salary';
 }
 
 let currentEmployeeId = null;
@@ -4100,6 +4119,8 @@ function renderBulkRows(){
           <select data-bulk-category="${i}" style="width:auto;" ${row.done?'disabled':''}>
             <option value="salary" ${row.category==='salary'?'selected':''}>明細</option>
             <option value="bonus" ${row.category==='bonus'?'selected':''}>賞与</option>
+            <option value="yearend" ${row.category==='yearend'?'selected':''}>年末調整</option>
+            <option value="raise" ${row.category==='raise'?'selected':''}>昇給/減給通知書</option>
           </select>
           <input type="number" data-bulk-year="${i}" placeholder="年" value="${row.y}" style="width:70px;" ${row.done?'disabled':''}>
           <input type="number" data-bulk-month="${i}" min="1" max="12" placeholder="月" value="${row.mo}" style="width:56px;" ${row.done?'disabled':''}>
@@ -7643,6 +7664,7 @@ function buildPdfDateSuffix(company, category, y, mo, day){
   let suffix = '';
   if(company === 'other') suffix += '_その他';
   if(category === 'bonus') suffix += '_賞与';
+  else if(isSpecialDocType(category)) suffix += SPECIAL_DOC_TYPES[category].suffix;
   return { dateStr, suffix };
 }
 function buildPdfBaseFilename(company, category, y, mo, day){
@@ -7726,7 +7748,7 @@ function openPdfRenameModal(file){
 
     nameEl.textContent = file.name;
     companyEl.value = 'dsbz';
-    categoryEl.value = file.name.includes('賞与') ? 'bonus' : 'salary';
+    categoryEl.value = docTypeFromFilename(file.name);
     const guessed = parseYearMonth(file.name);
     const now = new Date();
     yearEl.value = guessed ? guessed.y : now.getFullYear();
@@ -7899,7 +7921,10 @@ async function openFile(doc, label, payKey){
   renderMeisaiLists();
   document.getElementById('modal-title').textContent = label;
   document.getElementById('modal').classList.remove('hidden');
-  fillManualEntryForm('modal-man-', plainYm, doc, payKey || plainYm);
+  // 年末調整・昇給/減給通知書には金額の実績入力が無いため、入力欄（modal-footer）ごと隠す
+  const isSpecialDoc = isSpecialDocType(doc.type);
+  document.querySelector('#modal .modal-footer').style.display = isSpecialDoc ? 'none' : '';
+  if(!isSpecialDoc) fillManualEntryForm('modal-man-', plainYm, doc, payKey || plainYm);
   modalViewerRotation = 0;
   const viewer = document.getElementById('modal-viewer');
   viewer.innerHTML = '<p style="color:#eee;text-align:center;margin-top:40px;">読み込み中…</p>';
@@ -8162,9 +8187,11 @@ function renderLedgerRow(container, doc, ym, labelOverride, payKey){
     const delBtn = (doc.source==='drive' || doc.source==='localfolder') ? '' : `<button class="x-btn" style="font-size:16px;" data-del="${doc.id}">×</button>`;
     const ymKey = payKey || ((doc.y && doc.mo) ? `${doc.y}-${String(doc.mo).padStart(2,'0')}` : null) || doc.id;
     const rec = ymKey ? payHistory[ymKey] : null;
-    const registered = doc.type==='bonus' ? !!(rec && rec.bonus) : !!(rec && rec.salary);
+    const special = SPECIAL_DOC_TYPES[doc.type];
+    // 年末調整・昇給/減給通知書は金額の実績入力が無いため、常に「登録済み」扱い（未登録タグを出さない）
+    const registered = special ? true : (doc.type==='bonus' ? !!(rec && rec.bonus) : !!(rec && rec.salary));
     const unregTag = registered ? '' : '<span class="tag warn">未登録</span>';
-    const monthLabelStyle = doc.type==='bonus' ? ' style="color:var(--money);"' : '';
+    const monthLabelStyle = special ? ` style="color:${special.color};"` : (doc.type==='bonus' ? ' style="color:var(--money);"' : '');
     const viewedAt = getDocViewedAt(ymKey);
     const fText = viewedAt
       ? `<span class="viewed">${formatViewedTime(viewedAt)}</span>`
@@ -8307,10 +8334,25 @@ function renderMeisaiLists(){
   if(meisaiFilterIsActive()) renderMeisaiFilteredList();
   else renderMeisaiDefault();
 }
+// 年末調整・昇給/減給通知書の行を、指定した月・種類ぶん描画する。
+// 金額の実績（payHistory）を持たない書類なので、閲覧履歴などは書類ID単位のキーで管理する
+// （同じ月の給与明細の「最終閲覧」と混ざらないようにするため）。
+function renderSpecialDocsForMonth(container, docs, ym, type){
+  const list = docs.filter(d=>d.type===type && d.y===ym.y && d.mo===ym.mo)
+    .sort((a,b)=> a.name.localeCompare(b.name, 'ja'));
+  const baseLabel = `${ym.y}年${ym.mo}月度の${SPECIAL_DOC_TYPES[type].label}`;
+  list.forEach((doc, i)=>{
+    renderLedgerRow(container, doc, ym, numberedLabel(baseLabel, i, list.length), 'doc:'+doc.id);
+  });
+}
+function renderAllSpecialDocsForMonth(container, docs, ym){
+  Object.keys(SPECIAL_DOC_TYPES).forEach(type=>renderSpecialDocsForMonth(container, docs, ym, type));
+}
 function renderMeisaiDefault(){
   const allDocs = [...documents, ...driveDocs];
   const salaryDocs = allDocs.filter(d=>d.type==='salary');
   const bonusDocs = allDocs.filter(d=>d.type==='bonus');
+  const specialDocs = allDocs.filter(d=>isSpecialDocType(d.type));
 
   document.getElementById('btn-show-all').classList.remove('is-hidden');
 
@@ -8322,6 +8364,7 @@ function renderMeisaiDefault(){
     renderMonthDocsSplit(listEl, docsThisMonth, ym, `${ym.y}年${ym.mo}月度の明細`, `${ym.y}年${ym.mo}月度その他明細L`);
     const bonusDocsThisMonth = bonusDocs.filter(d=>d.y===ym.y && d.mo===ym.mo);
     if(bonusDocsThisMonth.length>0) renderMonthDocsSplit(listEl, bonusDocsThisMonth, ym, `${ym.y}年${ym.mo}月度の賞与明細`, `${ym.y}年${ym.mo}月度その他賞与明細L`);
+    renderAllSpecialDocsForMonth(listEl, specialDocs, ym);
   });
 
   const allEl = document.getElementById('meisai-all');
@@ -8332,25 +8375,34 @@ function renderMeisaiDefault(){
     const inRecent = recentKeys.has((d.y||0)*100+(d.mo||0));
     return !inRecent;
   });
-  if(fullRange.length===0 && extraBonus.length===0){
+  const extraSpecial = specialDocs.filter(d=>!recentKeys.has((d.y||0)*100+(d.mo||0)));
+  if(fullRange.length===0 && extraBonus.length===0 && extraSpecial.length===0){
     allEl.innerHTML = '<div class="empty">他に明細はありません。</div>';
   }else{
     const byYear = {};
-    fullRange.forEach(m=>{ (byYear[m.y] = byYear[m.y]||[]).push({mo:m.mo, kind:'salary'}); });
-    extraBonus.forEach(d=>{ if(d.y) (byYear[d.y] = byYear[d.y]||[]).push({mo:d.mo, kind:'bonus'}); });
+    const addItem = (y, mo, kind)=>{
+      const list = (byYear[y] = byYear[y]||[]);
+      if(!list.some(it=>it.mo===mo && it.kind===kind)) list.push({mo, kind});
+    };
+    fullRange.forEach(m=>addItem(m.y, m.mo, 'salary'));
+    extraBonus.forEach(d=>{ if(d.y) addItem(d.y, d.mo, 'bonus'); });
+    extraSpecial.forEach(d=>{ if(d.y) addItem(d.y, d.mo, d.type); });
+    const kindOrder = ['salary','bonus', ...Object.keys(SPECIAL_DOC_TYPES)];
     Object.keys(byYear).map(Number).sort((a,b)=>b-a).forEach(y=>{
       const yearHeader = document.createElement('div');
       yearHeader.style.cssText = 'font-size:12px;font-weight:700;color:var(--text-2);margin:14px 0 4px;';
       yearHeader.textContent = `${y}年`;
       allEl.appendChild(yearHeader);
-      const items = byYear[y].sort((a,b)=> b.mo - a.mo || (a.kind==='salary'?-1:1));
+      const items = byYear[y].sort((a,b)=> b.mo - a.mo || kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind));
       items.forEach(item=>{
         if(item.kind==='salary'){
           const docsThisMonth = salaryDocs.filter(d=>d.y===y && d.mo===item.mo);
           renderMonthDocsSplit(allEl, docsThisMonth, {y,mo:item.mo}, `${y}年${item.mo}月度の明細`, `${y}年${item.mo}月度その他明細L`);
-        }else{
+        }else if(item.kind==='bonus'){
           const docsThisMonth = bonusDocs.filter(d=>d.y===y && d.mo===item.mo);
           renderMonthDocsSplit(allEl, docsThisMonth, {y,mo:item.mo}, `${y}年${item.mo}月度の賞与明細`, `${y}年${item.mo}月度その他賞与明細L`);
+        }else{
+          renderSpecialDocsForMonth(allEl, specialDocs, {y,mo:item.mo}, item.kind);
         }
       });
     });
@@ -8366,6 +8418,7 @@ function renderMeisaiFilteredList(){
   const allDocs = [...documents, ...driveDocs];
   const salaryDocs = allDocs.filter(d=>d.type==='salary');
   const bonusDocs = allDocs.filter(d=>d.type==='bonus');
+  const specialDocs = allDocs.filter(d=>isSpecialDocType(d.type) && d.y && d.mo);
 
   const fromVal = document.getElementById('meisai-filter-from').value;
   const toVal = document.getElementById('meisai-filter-to').value;
@@ -8376,6 +8429,17 @@ function renderMeisaiFilteredList(){
     range = getFullMonthRange([{y:f[0],mo:f[1]},{y:t[0],mo:t[1]}]);
   }else{
     range = getFullMonthRange(salaryDocs);
+  }
+  // 年末調整・昇給/減給通知書は給与明細の月の範囲外にあることも多いため、
+  // 期間を指定していないときは、その月も一覧に加える（給与明細の「紛失」判定の範囲は広げない）。
+  const monthsToShow = range.map(m=>({y:m.y, mo:m.mo, withSalary:true}));
+  if(!(fromVal || toVal)){
+    const known = new Set(monthsToShow.map(m=>m.y*100+m.mo));
+    specialDocs.forEach(d=>{
+      const k = d.y*100+d.mo;
+      if(!known.has(k)){ known.add(k); monthsToShow.push({y:d.y, mo:d.mo, withSalary:false}); }
+    });
+    monthsToShow.sort((a,b)=>(a.y*100+a.mo)-(b.y*100+b.mo));
   }
 
   const listEl = document.getElementById('meisai-list');
@@ -8388,11 +8452,14 @@ function renderMeisaiFilteredList(){
   document.getElementById('btn-show-all').classList.add('is-hidden');
   document.getElementById('btn-show-all').textContent = 'すべての明細を表示';
 
-  range.slice().reverse().forEach(ym=>{
-    const docsThisMonth = salaryDocs.filter(d=>d.y===ym.y && d.mo===ym.mo);
-    renderMonthDocsSplit(listEl, docsThisMonth, ym, `${ym.y}年${ym.mo}月度の明細`, `${ym.y}年${ym.mo}月度その他明細L`);
-    const bonusDocsThisMonth = bonusDocs.filter(d=>d.y===ym.y && d.mo===ym.mo);
-    if(bonusDocsThisMonth.length>0) renderMonthDocsSplit(listEl, bonusDocsThisMonth, ym, `${ym.y}年${ym.mo}月度の賞与明細`, `${ym.y}年${ym.mo}月度その他賞与明細L`);
+  monthsToShow.slice().reverse().forEach(ym=>{
+    if(ym.withSalary){
+      const docsThisMonth = salaryDocs.filter(d=>d.y===ym.y && d.mo===ym.mo);
+      renderMonthDocsSplit(listEl, docsThisMonth, ym, `${ym.y}年${ym.mo}月度の明細`, `${ym.y}年${ym.mo}月度その他明細L`);
+      const bonusDocsThisMonth = bonusDocs.filter(d=>d.y===ym.y && d.mo===ym.mo);
+      if(bonusDocsThisMonth.length>0) renderMonthDocsSplit(listEl, bonusDocsThisMonth, ym, `${ym.y}年${ym.mo}月度の賞与明細`, `${ym.y}年${ym.mo}月度その他賞与明細L`);
+    }
+    renderAllSpecialDocsForMonth(listEl, specialDocs, ym);
   });
 
   const cats = meisaiFilterCategories;
@@ -8403,8 +8470,7 @@ function renderMeisaiFilteredList(){
     const matches = noCatRestriction || (isMissing
       ? cats.has('missing')
       : (
-        (cats.has('salary') && row.dataset.catType === 'salary') ||
-        (cats.has('bonus') && row.dataset.catType === 'bonus') ||
+        (!!row.dataset.catType && cats.has(row.dataset.catType)) ||
         (cats.has('other') && row.dataset.catLocal === '1') ||
         (cats.has('unregistered') && row.dataset.catRegistered === '0')
       ));
@@ -8849,7 +8915,7 @@ async function refreshDriveDocs(){
       return {
         id: f.id, name: f.name,
         y: ym?ym.y:null, mo: ym?ym.mo:null,
-        type: f.name.includes('賞与') ? 'bonus' : 'salary',
+        type: docTypeFromFilename(f.name),
         source: 'drive'
       };
     });
@@ -9531,7 +9597,7 @@ function renderSalaryChart(){
     return;
   }
 
-  const allDocsForRange = [...documents, ...driveDocs].filter(d=>d.y && d.mo);
+  const allDocsForRange = [...documents, ...driveDocs].filter(d=>d.y && d.mo && !isSpecialDocType(d.type));
   const dataMonths = [
     ...allDocsForRange.map(d=>({y:d.y, mo:d.mo})),
     ...Object.keys(payHistory).map(k=>{ const [y,mo]=k.split('#')[0].split('-').map(Number); return {y,mo}; }),
