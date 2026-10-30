@@ -1747,6 +1747,8 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
       <select id="modal-man-type">
         <option value="salary">給与明細</option>
         <option value="bonus">賞与明細</option>
+        <option value="yearend">年末調整</option>
+        <option value="raise">昇給/減給通知書</option>
       </select>
       <label class="field">対象年月</label>
       <input type="month" id="modal-man-month">
@@ -1761,10 +1763,28 @@ nav.tabbar button:not(.active):hover{background:var(--surface-2);color:var(--acc
         <label class="field">賞与額</label>
         <input type="text" inputmode="numeric" class="man-amount" id="modal-man-bonus">
       </div>
-      <label class="field">総支給額（参考・任意）</label>
-      <input type="text" inputmode="numeric" class="man-amount" id="modal-man-total">
-      <label class="field">差引支給額（手取り・グラフに使用）</label>
-      <input type="text" inputmode="numeric" class="man-amount" id="modal-man-net">
+      <div id="modal-man-yearend-fields" style="display:none;">
+        <label class="field">区分</label>
+        <select id="modal-man-ye-kind">
+          <option value="還付">還付（戻ってくる）</option>
+          <option value="徴収">徴収（追加で引かれる）</option>
+        </select>
+        <label class="field">金額</label>
+        <input type="text" inputmode="numeric" class="man-amount" id="modal-man-ye-amount">
+      </div>
+      <div id="modal-man-raise-fields" style="display:none;">
+        <label class="field">改定前の基本給</label>
+        <input type="text" inputmode="numeric" class="man-amount" id="modal-man-raise-before">
+        <label class="field">改定後の基本給</label>
+        <input type="text" inputmode="numeric" class="man-amount" id="modal-man-raise-after">
+        <p class="muted mt-6" id="modal-man-raise-diff"></p>
+      </div>
+      <div id="modal-man-common-fields">
+        <label class="field">総支給額（参考・任意）</label>
+        <input type="text" inputmode="numeric" class="man-amount" id="modal-man-total">
+        <label class="field">差引支給額（手取り・グラフに使用）</label>
+        <input type="text" inputmode="numeric" class="man-amount" id="modal-man-net">
+      </div>
       <button class="btn mt-12" id="modal-man-save">この内容をグラフに反映</button>
       <p class="muted mt-8" id="modal-man-status"></p>
     </div>
@@ -1916,7 +1936,7 @@ function formatViewedTime(ts){
 }
 
 // このHTML自体の版数。中身を更新するたびに手動で書き換えてください（自動更新お知らせの検知に使われます）
-const APP_VERSION_HTML = '2026.10.30.1';
+const APP_VERSION_HTML = '2026.10.30.2';
 // 会社全体で共通のApps Script URL（下記の固定値はフォールバック。起動時にブートストラップ用ドキュメントから最新値を取得します）
 let COMPANY_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq19EUlnHvLCCXA8IRHAzfCU2RJlm7O-eg5oamxCN3eBsice-8M32b3Ui9tnh9cyz0FQ/exec';
 const BOOTSTRAP_DOC_ID = '15EQ4RQavLe3hQpHMI8EycmonyyfdU5jRZ09l6rChbWI'; // GASのURLを書いた、公開閲覧可能なドキュメントのID
@@ -2774,6 +2794,8 @@ function resetPersonalDataForLogin(){
   saveJSON('otHoursByMonth', otHoursByMonth);
   payHistory = {};
   saveJSON('payHistory', payHistory);
+  docExtras = {};
+  saveJSON('docExtras', docExtras);
   // 新しいログインのたびに、Drive側の内容を確認し直すまではpushSettingsToDrive()を止める
   // （前のユーザーの確認済みフラグが残ったまま新しいユーザーのデータを書き込んでしまうのを防ぐ）
   driveSettingsSynced = false;
@@ -7921,10 +7943,7 @@ async function openFile(doc, label, payKey){
   renderMeisaiLists();
   document.getElementById('modal-title').textContent = label;
   document.getElementById('modal').classList.remove('hidden');
-  // 年末調整・昇給/減給通知書には金額の実績入力が無いため、入力欄（modal-footer）ごと隠す
-  const isSpecialDoc = isSpecialDocType(doc.type);
-  document.querySelector('#modal .modal-footer').style.display = isSpecialDoc ? 'none' : '';
-  if(!isSpecialDoc) fillManualEntryForm('modal-man-', plainYm, doc, payKey || plainYm);
+  fillManualEntryForm('modal-man-', plainYm, doc, payKey || plainYm);
   modalViewerRotation = 0;
   const viewer = document.getElementById('modal-viewer');
   viewer.innerHTML = '<p style="color:#eee;text-align:center;margin-top:40px;">読み込み中…</p>';
@@ -8634,6 +8653,14 @@ function serializeSettingsText(){
     }
   });
   lines.push('');
+  lines.push('書類補足履歴');
+  Object.keys(docExtras).sort().forEach(name=>{
+    const x = docExtras[name];
+    const safeName = name.replace(/[|\n]/g,'');
+    if(x.type === 'yearend') lines.push(`${safeName}|yearend|${x.kind==='徴収'?'徴収':'還付'}|${x.amount||0}`);
+    else if(x.type === 'raise') lines.push(`${safeName}|raise|${x.before||0}|${x.after||0}`);
+  });
+  lines.push('');
   const years = Object.keys(leave.byYear||{}).sort((a,b)=>b-a);
   years.forEach(y=>{ lines.push(`${y}有給残:${leave.byYear[y]}`); });
   lines.push('');
@@ -8650,7 +8677,7 @@ function serializeSettingsText(){
 
 function parseSettingsText(text){
   const lines = text.split('\n').map(l=>l.trim());
-  const result = { settings:{}, otHoursByMonth:{}, payHistory:{}, byYear:{}, usage:[], readNewsIds:[] };
+  const result = { settings:{}, otHoursByMonth:{}, payHistory:{}, docExtras:{}, byYear:{}, usage:[], readNewsIds:[] };
   let section = null;
   lines.forEach(line=>{
     if(!line) return;
@@ -8658,7 +8685,15 @@ function parseSettingsText(text){
     if(line === '残業時間履歴'){ section = 'ot'; return; }
     if(line === '給与実績履歴'){ section = 'pay'; return; }
     if(line === '既読ニュース'){ section = 'readnews'; return; }
+    if(line === '書類補足履歴'){ section = 'extras'; return; }
     let m;
+    if(section === 'extras'){
+      m = line.match(/^(.+)\|yearend\|(還付|徴収)\|(-?[\d.]+)$/);
+      if(m){ result.docExtras[m[1]] = { type:'yearend', kind:m[2], amount:parseFloat(m[3]) }; return; }
+      m = line.match(/^(.+)\|raise\|([\d.]+)\|([\d.]+)$/);
+      if(m){ result.docExtras[m[1]] = { type:'raise', before:parseFloat(m[2]), after:parseFloat(m[3]) }; return; }
+      section = null;
+    }
     if(section === 'readnews'){
       if(/^\d+$/.test(line)){ result.readNewsIds.push(line); return; }
       section = null;
@@ -8827,6 +8862,10 @@ async function pullSettingsFromDrive(retriesLeft){
       });
       saveJSON('payHistory', payHistory);
     }
+    if(Object.keys(parsed.docExtras).length>0){
+      Object.assign(docExtras, parsed.docExtras);
+      saveJSON('docExtras', docExtras);
+    }
     if(Object.keys(parsed.byYear).length>0){
       leave.byYear = parsed.byYear;
     }
@@ -8940,14 +8979,59 @@ function loadScript(src){
   });
 }
 
+// 年末調整・昇給/減給通知書の補足情報（書類のファイル名ごと）。給与タブの実績（payHistory）とは別に保存し、
+// グラフには使わない。{ 'ファイル名': {type:'yearend', kind:'還付', amount:12345} | {type:'raise', before:223000, after:230000} }
+let docExtras = loadJSON('docExtras', {});
+
+// 種別に合わせて、入力欄の組み合わせ（給与／賞与／年末調整／昇給・減給）を切り替える。
+// 年末調整・昇給/減給の欄は、書類ごとの入力ダイアログ（modal-man-）にだけある。
+function applyManualTypeFields(prefix){
+  const el = id => document.getElementById(prefix+id);
+  const type = el('type').value;
+  const show = (id, on)=>{ const e = el(id); if(e) e.style.display = on ? 'block' : 'none'; };
+  const special = isSpecialDocType(type);
+  show('salary-fields', type === 'salary');
+  show('bonus-fields', type === 'bonus');
+  show('yearend-fields', type === 'yearend');
+  show('raise-fields', type === 'raise');
+  show('common-fields', !special);
+  el('save').textContent = special ? 'この内容を保存' : 'この内容をグラフに反映';
+}
+function updateRaiseDiff(prefix){
+  const diffEl = document.getElementById(prefix+'raise-diff');
+  if(!diffEl) return;
+  const before = parseAmount(document.getElementById(prefix+'raise-before').value);
+  const after = parseAmount(document.getElementById(prefix+'raise-after').value);
+  if(!before || !after){ diffEl.textContent = ''; return; }
+  const diff = after - before;
+  diffEl.textContent = diff === 0 ? '金額の変更はありません。' : `${diff > 0 ? '昇給' : '減給'}：${diff > 0 ? '+' : '-'}${Math.abs(diff).toLocaleString('en-US')}円`;
+}
 function setupManualEntryForm(prefix){
   const el = id => document.getElementById(prefix+id);
-  el('type').addEventListener('change', ()=>{
-    const isBonus = el('type').value === 'bonus';
-    el('salary-fields').style.display = isBonus ? 'none' : 'block';
-    el('bonus-fields').style.display = isBonus ? 'block' : 'none';
+  el('type').addEventListener('change', ()=>applyManualTypeFields(prefix));
+  ['raise-before','raise-after'].forEach(id=>{
+    const e = el(id);
+    if(e) e.addEventListener('input', ()=>updateRaiseDiff(prefix));
   });
   el('save').addEventListener('click', async ()=>{
+    const type0 = el('type').value;
+    if(isSpecialDocType(type0) || (currentOcrFile && isSpecialDocType(currentOcrFile.type) && prefix === 'modal-man-')){
+      const doc = currentOcrFile;
+      if(!doc || doc.type !== type0){
+        const docLabel = doc && SPECIAL_DOC_TYPES[doc.type] ? SPECIAL_DOC_TYPES[doc.type].label : (doc && doc.type === 'bonus' ? '賞与明細' : '給与明細');
+        await showAlertModal(`この書類は「${docLabel}」として登録されています。種別を「${docLabel}」に戻してから保存してください。`);
+        return;
+      }
+      if(type0 === 'yearend'){
+        docExtras[doc.name] = { type:'yearend', kind: el('ye-kind').value, amount: parseAmount(el('ye-amount').value) };
+      }else{
+        docExtras[doc.name] = { type:'raise', before: parseAmount(el('raise-before').value), after: parseAmount(el('raise-after').value) };
+      }
+      saveJSON('docExtras', docExtras);
+      el('status').textContent = `${SPECIAL_DOC_TYPES[type0].label}の内容を保存しました。`;
+      if(settings.scriptUrl && settings.driveFolderId) await pushSettingsToDrive();
+      return;
+    }
     const ym = el('month').value;
     if(!ym){ await showAlertModal('対象年月を入力してください。'); return; }
     const paykeyEl = document.getElementById(prefix+'paykey');
@@ -9011,11 +9095,24 @@ function fillManualEntryForm(prefix, ym, doc, payKey){
   const key = payKey || ym;
   const paykeyEl = document.getElementById(prefix+'paykey');
   if(paykeyEl) paykeyEl.value = key || '';
+  if(doc && isSpecialDocType(doc.type)){
+    // 年末調整・昇給/減給通知書：payHistoryは使わず、書類ごとの補足情報（docExtras）を表示する
+    el('type').value = doc.type;
+    applyManualTypeFields(prefix);
+    const ex = docExtras[doc.name];
+    const fmt = v => (v === undefined || v === null || v === 0) ? '' : Number(v).toLocaleString('en-US');
+    el('ye-kind').value = (ex && ex.type==='yearend' && ex.kind) ? ex.kind : '還付';
+    el('ye-amount').value = ex && ex.type==='yearend' ? fmt(ex.amount) : '';
+    el('raise-before').value = ex && ex.type==='raise' ? fmt(ex.before) : '';
+    el('raise-after').value = ex && ex.type==='raise' ? fmt(ex.after) : '';
+    updateRaiseDiff(prefix);
+    el('status').textContent = '';
+    return;
+  }
   const rec = key ? payHistory[key] : null;
   const isBonus = (doc && doc.type==='bonus') || (rec && rec.bonus && !rec.salary);
   el('type').value = isBonus ? 'bonus' : 'salary';
-  el('salary-fields').style.display = isBonus ? 'none' : 'block';
-  el('bonus-fields').style.display = isBonus ? 'block' : 'none';
+  applyManualTypeFields(prefix);
   el('base').value = rec && rec.salary ? rec.salary.base.toLocaleString('en-US') : '';
   el('otpay').value = rec && rec.salary ? rec.salary.otPay.toLocaleString('en-US') : '';
   // 総支給額・差引支給額は給与・賞与で共用の欄のため、salaryの有無だけで決めず
